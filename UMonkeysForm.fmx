@@ -1,0 +1,279 @@
+object TabbedForm: TTabbedForm
+  Left = 0
+  Top = 0
+  Caption = 'Monkeys evolution program'
+  ClientHeight = 567
+  ClientWidth = 781
+  FormFactor.Width = 1440
+  FormFactor.Height = 900
+  FormFactor.Devices = [Desktop]
+  OnCreate = FormCreate
+  DesignerMasterStyle = 0
+  object TabControl: TTabControl
+    Align = Client
+    FullSize = True
+    Size.Width = 781.000000000000000000
+    Size.Height = 567.000000000000000000
+    Size.PlatformDefault = False
+    TabHeight = 49.000000000000000000
+    TabIndex = 0
+    TabOrder = 0
+    TabPosition = PlatformDefault
+    Sizes = (
+      781s
+      518s
+      781s
+      518s
+      781s
+      518s)
+    object WorldTab: TTabItem
+      CustomIcon = <
+        item
+        end>
+      TextSettings.Font.StyleExt = {00070000000000000004000000}
+      StyledSettings = [Family, Size, FontColor]
+      IsSelected = True
+      Size.Width = 259.000000000000000000
+      Size.Height = 49.000000000000000000
+      Size.PlatformDefault = False
+      StyleLookup = 'tabitemtoprated'
+      TabOrder = 0
+      Text = 'World'
+      ExplicitSize.cx = 50.000000000000000000
+      ExplicitSize.cy = 49.000000000000000000
+      object GroupBox1: TGroupBox
+        Align = MostRight
+        Position.X = 608.000000000000000000
+        Size.Width = 173.000000000000000000
+        Size.Height = 518.000000000000000000
+        Size.PlatformDefault = False
+        Text = 'Basic Controls'
+        TabOrder = 0
+        object Button1: TButton
+          Position.X = 16.000000000000000000
+          Position.Y = 24.000000000000000000
+          TabOrder = 38
+          Text = 'Start'
+        end
+      end
+      object ScrollBox1: TScrollBox
+        Align = Client
+        Size.Width = 608.000000000000000000
+        Size.Height = 518.000000000000000000
+        Size.PlatformDefault = False
+        TabOrder = 1
+        Viewport.Width = 608.000000000000000000
+        Viewport.Height = 518.000000000000000000
+        object PWorldBoard: TPaintBox
+          Align = Client
+          Size.Width = 608.000000000000000000
+          Size.Height = 518.000000000000000000
+          Size.PlatformDefault = False
+          OnPaint = PWorldBoardPaint
+        end
+      end
+    end
+    object ConTab: TTabItem
+      CustomIcon = <
+        item
+        end>
+      TextSettings.Font.StyleExt = {00070000000000000004000000}
+      StyledSettings = [Family, Size, FontColor]
+      IsSelected = False
+      Size.Width = 259.000000000000000000
+      Size.Height = 49.000000000000000000
+      Size.PlatformDefault = False
+      StyleLookup = 'tabitemcontacts'
+      TabOrder = 0
+      Text = 'Configuration && Statistics'
+      ExplicitSize.cx = 50.000000000000000000
+      ExplicitSize.cy = 49.000000000000000000
+      object ConfigGroup: TGroupBox
+        Align = MostLeft
+        Size.Width = 385.000000000000000000
+        Size.Height = 518.000000000000000000
+        Size.PlatformDefault = False
+        Text = 'Configuration'
+        TabOrder = 1
+        object NSizeX: TNumberBox
+          Touch.InteractiveGestures = [LongTap, DoubleTap]
+          TabOrder = 38
+          Cursor = crIBeam
+          Value = 50.000000000000000000
+          Position.X = 136.000000000000000000
+          Position.Y = 32.000000000000000000
+        end
+        object LWorldSizeX: TLabel
+          Position.X = 37.000000000000000000
+          Position.Y = 34.000000000000000000
+          Text = 'World size x'
+          TabOrder = 39
+        end
+        object NSizeY: TNumberBox
+          Touch.InteractiveGestures = [LongTap, DoubleTap]
+          TabOrder = 40
+          Cursor = crIBeam
+          Value = 50.000000000000000000
+          Position.X = 136.000000000000000000
+          Position.Y = 64.000000000000000000
+        end
+        object LWorldSizeY: TLabel
+          Position.X = 37.000000000000000000
+          Position.Y = 66.000000000000000000
+          Text = 'World size y'
+          TabOrder = 41
+        end
+        object NLifespan: TNumberBox
+          Touch.InteractiveGestures = [LongTap, DoubleTap]
+          TabOrder = 42
+          Cursor = crIBeam
+          Value = 100.000000000000000000
+          Position.X = 136.000000000000000000
+          Position.Y = 96.000000000000000000
+        end
+        object LBaseLifespan: TLabel
+          Position.X = 37.000000000000000000
+          Position.Y = 98.000000000000000000
+          Text = 'Base lifespan'
+          TabOrder = 43
+        end
+        object NVisionSlots: TNumberBox
+          Touch.InteractiveGestures = [LongTap, DoubleTap]
+          TabOrder = 44
+          Cursor = crIBeam
+          Value = 9.000000000000000000
+          Position.X = 136.000000000000000000
+          Position.Y = 128.000000000000000000
+        end
+        object LVisionSlots: TLabel
+          Position.X = 37.000000000000000000
+          Position.Y = 130.000000000000000000
+          Text = 'Vision slots'
+          TabOrder = 45
+        end
+        object NStrength: TNumberBox
+          Touch.InteractiveGestures = [LongTap, DoubleTap]
+          TabOrder = 46
+          Cursor = crIBeam
+          Value = 100.000000000000000000
+          Position.X = 136.000000000000000000
+          Position.Y = 160.000000000000000000
+        end
+        object LStrength: TLabel
+          Position.X = 37.000000000000000000
+          Position.Y = 162.000000000000000000
+          Text = 'Strength'
+          TabOrder = 47
+        end
+        object NMatingCost: TNumberBox
+          Touch.InteractiveGestures = [LongTap, DoubleTap]
+          TabOrder = 48
+          Cursor = crIBeam
+          Value = 5.000000000000000000
+          Position.X = 136.000000000000000000
+          Position.Y = 192.000000000000000000
+        end
+        object LMatingCost: TLabel
+          Position.X = 37.000000000000000000
+          Position.Y = 194.000000000000000000
+          Text = 'Mating cost'
+          TabOrder = 49
+        end
+        object NCombatGain: TNumberBox
+          Touch.InteractiveGestures = [LongTap, DoubleTap]
+          TabOrder = 50
+          Cursor = crIBeam
+          Value = 10.000000000000000000
+          Position.X = 136.000000000000000000
+          Position.Y = 224.000000000000000000
+        end
+        object LCombatGain: TLabel
+          Position.X = 37.000000000000000000
+          Position.Y = 226.000000000000000000
+          Text = 'Combat gain %'
+          TabOrder = 51
+        end
+        object NSigmaCombat: TNumberBox
+          Touch.InteractiveGestures = [LongTap, DoubleTap]
+          TabOrder = 52
+          Cursor = crIBeam
+          Value = 10.000000000000000000
+          Position.X = 136.000000000000000000
+          Position.Y = 256.000000000000000000
+        end
+        object LSigmaCombat: TLabel
+          Position.X = 37.000000000000000000
+          Position.Y = 258.000000000000000000
+          Text = 'Combat sigma'
+          TabOrder = 53
+        end
+        object NMutationSigma: TNumberBox
+          Touch.InteractiveGestures = [LongTap, DoubleTap]
+          TabOrder = 54
+          Cursor = crIBeam
+          Value = 5.000000000000000000
+          Position.X = 136.000000000000000000
+          Position.Y = 288.000000000000000000
+        end
+        object LMutationSigma: TLabel
+          Position.X = 37.000000000000000000
+          Position.Y = 290.000000000000000000
+          Text = 'Mutation sigma %'
+          TabOrder = 55
+        end
+        object NInitSigma: TNumberBox
+          Touch.InteractiveGestures = [LongTap, DoubleTap]
+          TabOrder = 56
+          Cursor = crIBeam
+          Value = 10.000000000000000000
+          Position.X = 136.000000000000000000
+          Position.Y = 320.000000000000000000
+        end
+        object LInitSigma: TLabel
+          Position.X = 37.000000000000000000
+          Position.Y = 322.000000000000000000
+          Text = 'Init sigma %'
+          TabOrder = 57
+        end
+        object NPopulationCount: TNumberBox
+          Touch.InteractiveGestures = [LongTap, DoubleTap]
+          TabOrder = 58
+          Cursor = crIBeam
+          Value = 50.000000000000000000
+          Position.X = 136.000000000000000000
+          Position.Y = 352.000000000000000000
+        end
+        object LPopulationCount: TLabel
+          Position.X = 37.000000000000000000
+          Position.Y = 354.000000000000000000
+          Text = 'Population count'
+          TabOrder = 59
+        end
+      end
+      object StatGroupBox: TGroupBox
+        Align = Client
+        Size.Width = 396.000000000000000000
+        Size.Height = 518.000000000000000000
+        Size.PlatformDefault = False
+        Text = 'Statistics'
+        TabOrder = 0
+      end
+    end
+    object NNTab: TTabItem
+      CustomIcon = <
+        item
+        end>
+      TextSettings.Font.StyleExt = {00070000000000000004000000}
+      StyledSettings = [Family, Size, FontColor]
+      IsSelected = False
+      Size.Width = 261.000000000000000000
+      Size.Height = 49.000000000000000000
+      Size.PlatformDefault = False
+      StyleLookup = 'tabitemrecent'
+      TabOrder = 0
+      Text = 'NN view'
+      ExplicitSize.cx = 50.000000000000000000
+      ExplicitSize.cy = 49.000000000000000000
+    end
+  end
+end

@@ -29,8 +29,10 @@
 # Default Delphi compiler directories
 # Content of this directories are generated with each Compile/Construct of a project.
 # Most of the time, files here have not there place in a code repository.
-#Win32/
-#Win64/
+Win32/
+Win64/
+Debug/
+Release/
 #OSX64/
 #OSXARM64/
 #Android/
@@ -69,6 +71,8 @@
 *.tvsconfig
 *.dsk
 *.dsv
+*.otares
+*.skincfg
 
 # Delphi history and backups
 __history/
@@ -80,3 +84,7 @@ __recovery/
 
 # Boss dependency manager vendor folder https://github.com/HashLoad/boss
 modules/
+
+# Temporary files
+*.tmp
+~$*
