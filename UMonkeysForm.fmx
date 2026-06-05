@@ -3,7 +3,7 @@ object TabbedForm: TTabbedForm
   Top = 0
   Caption = 'Monkeys evolution program'
   ClientHeight = 567
-  ClientWidth = 781
+  ClientWidth = 1055
   FormFactor.Width = 1440
   FormFactor.Height = 900
   FormFactor.Devices = [Desktop]
@@ -13,7 +13,7 @@ object TabbedForm: TTabbedForm
   object TabControl: TTabControl
     Align = Client
     FullSize = True
-    Size.Width = 781.000000000000000000
+    Size.Width = 1055.000000000000000000
     Size.Height = 567.000000000000000000
     Size.PlatformDefault = False
     TabHeight = 49.000000000000000000
@@ -21,11 +21,11 @@ object TabbedForm: TTabbedForm
     TabOrder = 0
     TabPosition = PlatformDefault
     Sizes = (
-      781s
+      1055s
       518s
-      781s
+      1055s
       518s
-      781s
+      1055s
       518s)
     object WorldTab: TTabItem
       CustomIcon = <
@@ -34,7 +34,7 @@ object TabbedForm: TTabbedForm
       TextSettings.Font.StyleExt = {00070000000000000004000000}
       StyledSettings = [Family, Size, FontColor]
       IsSelected = True
-      Size.Width = 259.000000000000000000
+      Size.Width = 351.000000000000000000
       Size.Height = 49.000000000000000000
       Size.PlatformDefault = False
       StyleLookup = 'tabitemtoprated'
@@ -44,7 +44,7 @@ object TabbedForm: TTabbedForm
       ExplicitSize.cy = 49.000000000000000000
       object ControlBox: TGroupBox
         Align = MostRight
-        Position.X = 608.000000000000000000
+        Position.X = 882.000000000000000000
         Size.Width = 173.000000000000000000
         Size.Height = 518.000000000000000000
         Size.PlatformDefault = False
@@ -97,17 +97,18 @@ object TabbedForm: TTabbedForm
       end
       object ScrollBox1: TScrollBox
         Align = Client
-        Size.Width = 608.000000000000000000
+        Size.Width = 882.000000000000000000
         Size.Height = 518.000000000000000000
         Size.PlatformDefault = False
         TabOrder = 1
-        Viewport.Width = 608.000000000000000000
+        Viewport.Width = 882.000000000000000000
         Viewport.Height = 518.000000000000000000
         object PWorldBoard: TPaintBox
           Size.Width = 608.000000000000000000
           Size.Height = 518.000000000000000000
           Size.PlatformDefault = False
-          OnMouseDown = PWorldBoardMouseDown
+          OnMouseMove = PWorldBoardMouseMove
+          OnMouseLeave = PWorldBoardMouseLeave
           OnPaint = PWorldBoardPaint
         end
       end
@@ -119,7 +120,7 @@ object TabbedForm: TTabbedForm
       TextSettings.Font.StyleExt = {00070000000000000004000000}
       StyledSettings = [Family, Size, FontColor]
       IsSelected = False
-      Size.Width = 259.000000000000000000
+      Size.Width = 351.000000000000000000
       Size.Height = 49.000000000000000000
       Size.PlatformDefault = False
       StyleLookup = 'tabitemcontacts'
@@ -291,7 +292,7 @@ object TabbedForm: TTabbedForm
       end
       object StatGroupBox: TGroupBox
         Align = Client
-        Size.Width = 396.000000000000000000
+        Size.Width = 670.000000000000000000
         Size.Height = 518.000000000000000000
         Size.PlatformDefault = False
         Text = 'Statistics'
@@ -305,7 +306,7 @@ object TabbedForm: TTabbedForm
       TextSettings.Font.StyleExt = {00070000000000000004000000}
       StyledSettings = [Family, Size, FontColor]
       IsSelected = False
-      Size.Width = 261.000000000000000000
+      Size.Width = 351.000000000000000000
       Size.Height = 49.000000000000000000
       Size.PlatformDefault = False
       StyleLookup = 'tabitemrecent'

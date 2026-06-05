@@ -76,6 +76,7 @@ type
     FVisionSlots: Integer;
     FMemory: TMonkeyMemorySlots;
     FCurrentVision: TMonkeyVisionDecision;
+    FUnbornChild: TMonkey;
     FPregnantTurnsRemaining: Integer;
     FAlive: Boolean;
 
@@ -86,21 +87,27 @@ type
     function FindUnknownMemorySlot: Integer;
     function GetIsPregnant: Boolean;
     function GetMemoryCount: Integer;
+    function GetTotalStrength: Double;
     function SexAsNNValue(const ASlot: TMonkeyMemorySlot): Double;
     procedure ClearMemorySlot(var ASlot: TMonkeyMemorySlot);
     procedure InitializeMemory;
     procedure StoreVisionSlot(const AVisionSlot: TMonkeyVisionSlot);
   public
     constructor Create(const AInit: TMonkeyInit);
+    destructor Destroy; override;
 
     function BuildNNInput: TMonkeyNNInputs;
     function CurrentVisionDecision: TMonkeyVisionDecision;
     function DecideNextAction(const AVisionSlots: TMonkeyVisionSlots): TMonkeyActionDecision;
+    function ExtractUnbornChild: TMonkey;
     function IsNaturalDeathDue: Boolean;
+    function WantsToMateWith(const AMate: TMonkey): Boolean;
     procedure AdvanceAge;
     procedure ClearMemory;
+    procedure DiscardUnbornChild;
+    procedure ApplyMatingCost(const ATurnCost: Double);
     procedure Kill;
-    procedure StartPregnancy(const ATurns: Integer);
+    procedure StartPregnancy(const ATurns: Integer; const AUnbornChild: TMonkey);
     procedure AdvancePregnancy;
     procedure ShiftMemoryAfterMove(const ADeltaX, ADeltaY: Integer);
     procedure UpdateMemoryFromVision(const AVisionSlots: TMonkeyVisionSlots);
@@ -115,17 +122,22 @@ type
     property PaternalGrandfatherId: TMonkeyId read FPaternalGrandfatherId;
     property GenCount: Integer read FGenCount;
     property Strength: Double read FStrength write FStrength;
+    property TotalStrength: Double read GetTotalStrength;
     property Lifespan: Double read FLifespan write FLifespan;
     property Age: Integer read FAge;
     property VisionSlots: Integer read FVisionSlots;
     property CurrentVision: TMonkeyVisionDecision read FCurrentVision;
     property MemoryCount: Integer read GetMemoryCount;
+    property UnbornChild: TMonkey read FUnbornChild;
     property PregnantTurnsRemaining: Integer read FPregnantTurnsRemaining;
     property IsPregnant: Boolean read GetIsPregnant;
     property Alive: Boolean read FAlive;
   end;
 
 implementation
+
+uses
+  System.Math;
 
 { TMonkeyVisionDecision }
 
@@ -166,8 +178,15 @@ begin
   FCurrentVision := TMonkeyVisionDecision.Default;
   InitializeMemory;
   FAge := 0;
+  FUnbornChild := nil;
   FPregnantTurnsRemaining := 0;
   FAlive := True;
+end;
+
+destructor TMonkey.Destroy;
+begin
+  DiscardUnbornChild;
+  inherited Destroy;
 end;
 
 procedure TMonkey.AdvanceAge;
@@ -184,6 +203,16 @@ procedure TMonkey.AdvancePregnancy;
 begin
   if FPregnantTurnsRemaining > 0 then
     Dec(FPregnantTurnsRemaining);
+end;
+
+procedure TMonkey.ApplyMatingCost(const ATurnCost: Double);
+begin
+  if not FAlive then
+    Exit;
+
+  FLifespan := EnsurePositive(FLifespan - Max(0, ATurnCost), 0.01);
+  if IsNaturalDeathDue then
+    Kill;
 end;
 
 function TMonkey.BuildNNInput: TMonkeyNNInputs;
@@ -248,7 +277,15 @@ begin
 
   Result := TMonkeyActionDecision.Stay(FCurrentVision);
   Result.MoveDirection := 1;
+  Result.WantsToMate := True;
   FCurrentVision := Result.NextVision;
+end;
+
+procedure TMonkey.DiscardUnbornChild;
+begin
+  FUnbornChild.Free;
+  FUnbornChild := nil;
+  FPregnantTurnsRemaining := 0;
 end;
 
 class function TMonkey.EnsureAtLeast(const AValue, AMinimum: Integer): Integer;
@@ -289,6 +326,13 @@ begin
       Exit(I);
 end;
 
+function TMonkey.ExtractUnbornChild: TMonkey;
+begin
+  Result := FUnbornChild;
+  FUnbornChild := nil;
+  FPregnantTurnsRemaining := 0;
+end;
+
 function TMonkey.GetIsPregnant: Boolean;
 begin
   Result := FPregnantTurnsRemaining > 0;
@@ -297,6 +341,17 @@ end;
 function TMonkey.GetMemoryCount: Integer;
 begin
   Result := Length(FMemory);
+end;
+
+function TMonkey.GetTotalStrength: Double;
+var
+  HalfLifespan: Double;
+begin
+  HalfLifespan := FLifespan / 2;
+  if FAge < HalfLifespan then
+    Result := FStrength + FAge
+  else
+    Result := FStrength - FAge + HalfLifespan;
 end;
 
 procedure TMonkey.InitializeMemory;
@@ -315,12 +370,25 @@ begin
   FAlive := False;
 end;
 
-procedure TMonkey.StartPregnancy(const ATurns: Integer);
+procedure TMonkey.StartPregnancy(const ATurns: Integer;
+  const AUnbornChild: TMonkey);
 begin
   if FSex <> msFemale then
     Exit;
+  if IsPregnant then
+    Exit;
+  if AUnbornChild = nil then
+    Exit;
 
+  DiscardUnbornChild;
+  FUnbornChild := AUnbornChild;
   FPregnantTurnsRemaining := EnsureAtLeast(ATurns, 0);
+end;
+
+function TMonkey.WantsToMateWith(const AMate: TMonkey): Boolean;
+begin
+  Result := FAlive and (AMate <> nil) and AMate.Alive and
+    (FSex <> AMate.Sex) and not IsPregnant;
 end;
 
 function TMonkey.SexAsNNValue(const ASlot: TMonkeyMemorySlot): Double;

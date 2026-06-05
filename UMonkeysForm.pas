@@ -51,19 +51,26 @@ type
     procedure FormDestroy(Sender: TObject);
     procedure BResetClick(Sender: TObject);
     procedure BStepClick(Sender: TObject);
-    procedure PWorldBoardMouseDown(Sender: TObject; Button: TMouseButton;
-      Shift: TShiftState; X, Y: Single);
+    procedure PWorldBoardMouseLeave(Sender: TObject);
+    procedure PWorldBoardMouseMove(Sender: TObject; Shift: TShiftState; X,
+      Y: Single);
     procedure PWorldBoardPaint(Sender: TObject; Canvas: TCanvas);
   private
     { Private declarations }
     FWorld: TWorld;
     FCellSize: Single;
+    FMonkeyHoverBox: TRectangle;
+    FMonkeyHoverText: TText;
     function BuildWorldConfig: TWorldConfig;
+    procedure CreateMonkeyHoverBox;
     procedure DrawMonkey(Canvas: TCanvas; const AX, AY: Integer;
       const ASex: TMonkeySex; const AIsPregnant: Boolean);
     function FormatMonkeyTraits(const ATraits: TMonkeyTraitSnapshot): string;
+    procedure HideMonkeyHoverBox;
     function MonkeySexToText(const ASex: TMonkeySex): string;
     procedure RestartBoard;
+    procedure ShowMonkeyHoverBox(const AX, AY: Single;
+      const ATraits: TMonkeyTraitSnapshot);
   public
     { Public declarations }
   end;
@@ -80,11 +87,13 @@ begin
   { This defines the default active tab at runtime }
   TabControl.ActiveTab := WorldTab;
   FWorld := TWorld.Create;
+  CreateMonkeyHoverBox;
   RestartBoard;
 end;
 
 procedure TTabbedForm.FormDestroy(Sender: TObject);
 begin
+  FreeAndNil(FMonkeyHoverBox);
   FreeAndNil(FWorld);
 end;
 
@@ -96,26 +105,35 @@ end;
 procedure TTabbedForm.BStepClick(Sender: TObject);
 begin
   FWorld.RunWorldTurn;
+  HideMonkeyHoverBox;
   PWorldBoard.Repaint;
 end;
 
-procedure TTabbedForm.PWorldBoardMouseDown(Sender: TObject;
-  Button: TMouseButton; Shift: TShiftState; X, Y: Single);
+procedure TTabbedForm.PWorldBoardMouseLeave(Sender: TObject);
+begin
+  HideMonkeyHoverBox;
+end;
+
+procedure TTabbedForm.PWorldBoardMouseMove(Sender: TObject;
+  Shift: TShiftState; X, Y: Single);
 var
   BoardX: Integer;
   BoardY: Integer;
   Traits: TMonkeyTraitSnapshot;
 begin
-  if Button <> TMouseButton.mbLeft then
-    Exit;
   if FCellSize <= 0 then
+  begin
+    HideMonkeyHoverBox;
     Exit;
+  end;
 
   BoardX := Trunc(X / FCellSize);
   BoardY := Trunc(Y / FCellSize);
 
   if FWorld.TryGetMonkeyTraitsAt(BoardX, BoardY, Traits) then
-    ShowMessage(FormatMonkeyTraits(Traits));
+    ShowMonkeyHoverBox(X, Y, Traits)
+  else
+    HideMonkeyHoverBox;
 end;
 
 procedure TTabbedForm.PWorldBoardPaint(Sender: TObject; Canvas: TCanvas);
@@ -169,6 +187,32 @@ begin
   Result.PopulationCount := Round(NPopulationCount.Value);
 end;
 
+procedure TTabbedForm.CreateMonkeyHoverBox;
+begin
+  FMonkeyHoverBox := TRectangle.Create(Self);
+  FMonkeyHoverBox.Parent := WorldTab;
+  FMonkeyHoverBox.Visible := False;
+  FMonkeyHoverBox.HitTest := False;
+  FMonkeyHoverBox.Width := 300;
+  FMonkeyHoverBox.Height := 360;
+  FMonkeyHoverBox.Fill.Color := $EEFFFFFF;
+  FMonkeyHoverBox.Stroke.Color := $FF808080;
+  FMonkeyHoverBox.XRadius := 4;
+  FMonkeyHoverBox.YRadius := 4;
+
+  FMonkeyHoverText := TText.Create(FMonkeyHoverBox);
+  FMonkeyHoverText.Parent := FMonkeyHoverBox;
+  FMonkeyHoverText.HitTest := False;
+  FMonkeyHoverText.Position.X := 8;
+  FMonkeyHoverText.Position.Y := 8;
+  FMonkeyHoverText.Width := FMonkeyHoverBox.Width - 16;
+  FMonkeyHoverText.Height := FMonkeyHoverBox.Height - 16;
+  FMonkeyHoverText.TextSettings.Font.Size := 12;
+  FMonkeyHoverText.TextSettings.FontColor := TAlphaColors.Black;
+  FMonkeyHoverText.TextSettings.HorzAlign := TTextAlign.Leading;
+  FMonkeyHoverText.TextSettings.VertAlign := TTextAlign.Leading;
+end;
+
 procedure TTabbedForm.DrawMonkey(Canvas: TCanvas; const AX, AY: Integer;
   const ASex: TMonkeySex; const AIsPregnant: Boolean);
 var
@@ -204,6 +248,7 @@ begin
     Format('Paternal grandfather Id: %d', [ATraits.PaternalGrandfatherId]) + sLineBreak +
     Format('Generation count: %d', [ATraits.GenCount]) + sLineBreak +
     Format('Strength: %.2f', [ATraits.Strength]) + sLineBreak +
+    Format('Total strength: %.2f', [ATraits.TotalStrength]) + sLineBreak +
     Format('Lifespan: %.2f', [ATraits.Lifespan]) + sLineBreak +
     Format('Age: %d', [ATraits.Age]) + sLineBreak +
     Format('Vision slots: %d', [ATraits.VisionSlots]) + sLineBreak +
@@ -211,6 +256,12 @@ begin
     Format('Pregnant turns remaining: %d', [ATraits.PregnantTurnsRemaining]) + sLineBreak +
     Format('Pregnant: %s', [BoolToStr(ATraits.IsPregnant, True)]) + sLineBreak +
     Format('Alive: %s', [BoolToStr(ATraits.Alive, True)]);
+end;
+
+procedure TTabbedForm.HideMonkeyHoverBox;
+begin
+  if FMonkeyHoverBox <> nil then
+    FMonkeyHoverBox.Visible := False;
 end;
 
 function TTabbedForm.MonkeySexToText(const ASex: TMonkeySex): string;
@@ -228,6 +279,7 @@ end;
 procedure TTabbedForm.RestartBoard;
 begin
   FWorld.Restart(BuildWorldConfig);
+  HideMonkeyHoverBox;
   FCellSize := 16;
 
   //PWorldBoard.Align := TAlignLayout.None;
@@ -236,6 +288,35 @@ begin
   PWorldBoard.Width := FWorld.SizeX * FCellSize;
   PWorldBoard.Height := FWorld.SizeY * FCellSize;
   PWorldBoard.Repaint;
+end;
+
+procedure TTabbedForm.ShowMonkeyHoverBox(const AX, AY: Single;
+  const ATraits: TMonkeyTraitSnapshot);
+var
+  BoardPoint: TPointF;
+  PopupPoint: TPointF;
+begin
+  if (FMonkeyHoverBox = nil) or (FMonkeyHoverText = nil) then
+    Exit;
+
+  FMonkeyHoverText.Text := FormatMonkeyTraits(ATraits);
+
+  BoardPoint := PWorldBoard.LocalToAbsolute(TPointF.Create(AX + 16, AY + 16));
+  PopupPoint := WorldTab.AbsoluteToLocal(BoardPoint);
+
+  if PopupPoint.X + FMonkeyHoverBox.Width > WorldTab.Width then
+    PopupPoint.X := PopupPoint.X - FMonkeyHoverBox.Width - 32;
+  if PopupPoint.Y + FMonkeyHoverBox.Height > WorldTab.Height then
+    PopupPoint.Y := WorldTab.Height - FMonkeyHoverBox.Height - 8;
+  if PopupPoint.X < 8 then
+    PopupPoint.X := 8;
+  if PopupPoint.Y < 8 then
+    PopupPoint.Y := 8;
+
+  FMonkeyHoverBox.Position.X := PopupPoint.X;
+  FMonkeyHoverBox.Position.Y := PopupPoint.Y;
+  FMonkeyHoverBox.BringToFront;
+  FMonkeyHoverBox.Visible := True;
 end;
 
 end.
