@@ -317,6 +317,8 @@
             <Form>TabbedForm</Form>
             <FormType>fmx</FormType>
         </DCCReference>
+        <DCCReference Include="UWorld.pas"/>
+        <DCCReference Include="UMonkey.pas"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>
         </BuildConfiguration>

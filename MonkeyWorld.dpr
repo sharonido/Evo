@@ -3,7 +3,9 @@ program MonkeyWorld;
 uses
   System.StartUpCopy,
   FMX.Forms,
-  UMonkeysForm in 'UMonkeysForm.pas' {TabbedForm};
+  UMonkeysForm in 'UMonkeysForm.pas' {TabbedForm},
+  UWorld in 'UWorld.pas',
+  UMonkey in 'UMonkey.pas';
 
 {$R *.res}
 

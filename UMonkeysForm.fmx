@@ -8,6 +8,7 @@ object TabbedForm: TTabbedForm
   FormFactor.Height = 900
   FormFactor.Devices = [Desktop]
   OnCreate = FormCreate
+  OnDestroy = FormDestroy
   DesignerMasterStyle = 0
   object TabControl: TTabControl
     Align = Client
@@ -41,7 +42,7 @@ object TabbedForm: TTabbedForm
       Text = 'World'
       ExplicitSize.cx = 50.000000000000000000
       ExplicitSize.cy = 49.000000000000000000
-      object GroupBox1: TGroupBox
+      object ControlBox: TGroupBox
         Align = MostRight
         Position.X = 608.000000000000000000
         Size.Width = 173.000000000000000000
@@ -49,11 +50,49 @@ object TabbedForm: TTabbedForm
         Size.PlatformDefault = False
         Text = 'Basic Controls'
         TabOrder = 0
-        object Button1: TButton
+        object BStart: TButton
           Position.X = 16.000000000000000000
           Position.Y = 24.000000000000000000
           TabOrder = 38
           Text = 'Start'
+        end
+        object BPause: TButton
+          Position.X = 16.000000000000000000
+          Position.Y = 64.000000000000000000
+          TabOrder = 39
+          Text = 'Pause'
+        end
+        object BReset: TButton
+          Position.X = 16.000000000000000000
+          Position.Y = 104.000000000000000000
+          TabOrder = 40
+          Text = 'Reset'
+          OnClick = BResetClick
+        end
+        object BStep: TButton
+          Position.X = 16.000000000000000000
+          Position.Y = 144.000000000000000000
+          TabOrder = 41
+          Text = 'Step'
+          OnClick = BStepClick
+        end
+        object LTurnSpeed: TLabel
+          Position.X = 16.000000000000000000
+          Position.Y = 200.000000000000000000
+          Text = 'Turn speed'
+          TabOrder = 42
+        end
+        object TurnSpeedTrack: TTrackBar
+          CanParentFocus = True
+          Min = 1.000000000000000000
+          Orientation = Horizontal
+          Position.X = 16.000000000000000000
+          Position.Y = 224.000000000000000000
+          Size.Width = 140.000000000000000000
+          Size.Height = 19.000000000000000000
+          Size.PlatformDefault = False
+          TabOrder = 43
+          Value = 50.000000000000000000
         end
       end
       object ScrollBox1: TScrollBox
@@ -65,10 +104,10 @@ object TabbedForm: TTabbedForm
         Viewport.Width = 608.000000000000000000
         Viewport.Height = 518.000000000000000000
         object PWorldBoard: TPaintBox
-          Align = Client
           Size.Width = 608.000000000000000000
           Size.Height = 518.000000000000000000
           Size.PlatformDefault = False
+          OnMouseDown = PWorldBoardMouseDown
           OnPaint = PWorldBoardPaint
         end
       end
