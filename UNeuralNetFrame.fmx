@@ -2,7 +2,7 @@ object NeuralNetFrame: TNeuralNetFrame
   Size.Width = 1001.000000000000000000
   Size.Height = 518.000000000000000000
   Size.PlatformDefault = False
-  object NNTabControl: TTabControl
+  object TabControl1: TTabControl
     Align = Client
     Size.Width = 1001.000000000000000000
     Size.Height = 518.000000000000000000
@@ -12,16 +12,16 @@ object NeuralNetFrame: TNeuralNetFrame
     TabPosition = PlatformDefault
     Sizes = (
       1001s
-      513s
+      492s
       1001s
-      513s)
+      492s)
     object TabNNView: TTabItem
       CustomIcon = <
         item
         end>
       IsSelected = True
-      Size.Width = 1.000000000000000000
-      Size.Height = 5.000000000000000000
+      Size.Width = 81.000000000000000000
+      Size.Height = 26.000000000000000000
       Size.PlatformDefault = False
       StyleLookup = ''
       TabOrder = 0
@@ -32,7 +32,7 @@ object NeuralNetFrame: TNeuralNetFrame
         Align = MostRight
         Position.X = 881.000000000000000000
         Size.Width = 120.000000000000000000
-        Size.Height = 513.000000000000000000
+        Size.Height = 492.000000000000000000
         Size.PlatformDefault = False
         Text = 'View Control'
         TabOrder = 0
@@ -40,7 +40,7 @@ object NeuralNetFrame: TNeuralNetFrame
       object PaintBoxNNGraphView: TPaintBox
         Align = Client
         Size.Width = 881.000000000000000000
-        Size.Height = 513.000000000000000000
+        Size.Height = 492.000000000000000000
         Size.PlatformDefault = False
         OnMouseMove = PaintBoxNNGraphViewMouseMove
         OnMouseLeave = PaintBoxNNGraphViewMouseLeave
@@ -52,8 +52,8 @@ object NeuralNetFrame: TNeuralNetFrame
         item
         end>
       IsSelected = False
-      Size.Width = 1.000000000000000000
-      Size.Height = 5.000000000000000000
+      Size.Width = 44.000000000000000000
+      Size.Height = 26.000000000000000000
       Size.PlatformDefault = False
       StyleLookup = ''
       TabOrder = 0
@@ -64,7 +64,7 @@ object NeuralNetFrame: TNeuralNetFrame
         Align = MostRight
         Position.X = 881.000000000000000000
         Size.Width = 120.000000000000000000
-        Size.Height = 513.000000000000000000
+        Size.Height = 492.000000000000000000
         Size.PlatformDefault = False
         Text = 'Json Control'
         TabOrder = 0
@@ -74,11 +74,11 @@ object NeuralNetFrame: TNeuralNetFrame
         DataDetectorTypes = []
         Align = Client
         Size.Width = 881.000000000000000000
-        Size.Height = 513.000000000000000000
+        Size.Height = 492.000000000000000000
         Size.PlatformDefault = False
         TabOrder = 1
         Viewport.Width = 881.000000000000000000
-        Viewport.Height = 513.000000000000000000
+        Viewport.Height = 492.000000000000000000
       end
     end
   end

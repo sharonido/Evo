@@ -11,14 +11,13 @@ uses
 
 type
   TNeuralNetFrame = class(TFrame)
-    NNTabControl: TTabControl;
+    TabControl1: TTabControl;
     TabNNView: TTabItem;
     GroupViewControl: TGroupBox;
     PaintBoxNNGraphView: TPaintBox;
     TabNNJson: TTabItem;
     GroupBoxNNJsonControl: TGroupBox;
     MemoJson: TMemo;
-    procedure FrameCreate(Sender: TObject);
     procedure PaintBoxNNGraphViewMouseLeave(Sender: TObject);
     procedure PaintBoxNNGraphViewMouseMove(Sender: TObject; Shift: TShiftState;
       X, Y: Single);
@@ -52,6 +51,7 @@ type
     procedure UpdateMemoJson;
     procedure UpdateNNGraphInfoText;
   public
+    constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
     procedure ActivateGraphView;
     procedure ClearMonkeyBrain;
@@ -66,7 +66,7 @@ implementation
 
 procedure TNeuralNetFrame.ActivateGraphView;
 begin
-  NNTabControl.ActiveTab := TabNNView;
+  TabControl1.ActiveTab := TabNNView;
 end;
 
 procedure TNeuralNetFrame.ClearMonkeyBrain;
@@ -433,8 +433,9 @@ begin
   DrawOutputLabels;
 end;
 
-procedure TNeuralNetFrame.FrameCreate(Sender: TObject);
+constructor TNeuralNetFrame.Create(AOwner: TComponent);
 begin
+  inherited Create(AOwner);
   CreateNNGraphInfoText;
   CreateNNInputHoverBox;
   ClearMonkeyBrain;
@@ -541,6 +542,7 @@ procedure TNeuralNetFrame.ShowNNInputHoverBox(const AInputIndex: Integer);
 var
   OutputIndex: Integer;
   DirectionValue: Integer;
+  PopupPoint: TPointF;
 begin
   if (FNNInputHoverBox = nil) or (FNNInputHoverText = nil) then
     Exit;
@@ -604,9 +606,19 @@ begin
       Format('Value: %.5f', [FSelectedNNOutputs[OutputIndex]]);
   end;
 
-  FNNInputHoverBox.Position.X := Max(8,
-    (PaintBoxNNGraphView.Width - FNNInputHoverBox.Width) / 2);
-  FNNInputHoverBox.Position.Y := Max(8, PaintBoxNNGraphView.Height / 2);
+  PopupPoint := TPointF.Create(
+    (PaintBoxNNGraphView.Width - FNNInputHoverBox.Width) / 2,
+    PaintBoxNNGraphView.Height / 2);
+
+  if PopupPoint.X + FNNInputHoverBox.Width > PaintBoxNNGraphView.Width - 8 then
+    PopupPoint.X := PaintBoxNNGraphView.Width - FNNInputHoverBox.Width - 8;
+  if PopupPoint.Y + FNNInputHoverBox.Height > PaintBoxNNGraphView.Height - 8 then
+    PopupPoint.Y := PaintBoxNNGraphView.Height - FNNInputHoverBox.Height - 8;
+  PopupPoint.X := Max(8, PopupPoint.X);
+  PopupPoint.Y := Max(8, PopupPoint.Y);
+
+  FNNInputHoverBox.Position.X := PopupPoint.X;
+  FNNInputHoverBox.Position.Y := PopupPoint.Y;
   FNNInputHoverBox.BringToFront;
   FNNInputHoverBox.Visible := True;
 end;

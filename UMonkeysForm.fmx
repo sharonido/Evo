@@ -327,7 +327,7 @@ object TabbedForm: TTabbedForm
       Text = 'NN view'
       ExplicitSize.cx = 50.000000000000000000
       ExplicitSize.cy = 49.000000000000000000
-      object NeuralNetFrame1: TNeuralNetFrame
+      inline NeuralNetFrame1: TNeuralNetFrame
         Align = Client
         Size.Width = 1001.000000000000000000
         Size.Height = 518.000000000000000000

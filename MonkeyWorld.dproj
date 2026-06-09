@@ -322,7 +322,7 @@
         <DCCReference Include="UNeuralNet.pas"/>
         <DCCReference Include="UNeuralNetFrame.pas">
             <Form>NeuralNetFrame</Form>
-            <FormType>fmx</FormType>
+            <DesignClass>TFrame</DesignClass>
         </DCCReference>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>

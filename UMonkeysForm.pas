@@ -413,6 +413,7 @@ begin
 
   TurnsPerSecond := Max(1, TurnSpeedTrack.Value);
   FRunTimer.Interval := Max(1, Round(1000 / TurnsPerSecond));
+  LTurnSpeed.Text := Format('Turn speed: %.0f steps/sec', [TurnsPerSecond]);
 end;
 
 end.
