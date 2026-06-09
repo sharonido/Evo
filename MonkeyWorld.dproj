@@ -319,6 +319,11 @@
         </DCCReference>
         <DCCReference Include="UWorld.pas"/>
         <DCCReference Include="UMonkey.pas"/>
+        <DCCReference Include="UNeuralNet.pas"/>
+        <DCCReference Include="UNeuralNetFrame.pas">
+            <Form>NeuralNetFrame</Form>
+            <FormType>fmx</FormType>
+        </DCCReference>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>
         </BuildConfiguration>

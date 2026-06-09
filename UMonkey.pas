@@ -2,6 +2,9 @@ unit UMonkey;
 
 interface
 
+uses
+  UNeuralNet;
+
 type
   TMonkeyId = Int64;
 
@@ -57,6 +60,7 @@ type
     Strength: Double;
     Lifespan: Double;
     VisionSlots: Integer;
+    BrainWeights: TNeuralNetWeights;
   end;
 
   TMonkey = class
@@ -74,6 +78,7 @@ type
     FLifespan: Double;
     FAge: Integer;
     FVisionSlots: Integer;
+    FBrainWeights: TNeuralNetWeights;
     FMemory: TMonkeyMemorySlots;
     FCurrentVision: TMonkeyVisionDecision;
     FUnbornChild: TMonkey;
@@ -88,6 +93,7 @@ type
     function GetIsPregnant: Boolean;
     function GetMemoryCount: Integer;
     function GetTotalStrength: Double;
+    function GetBrainWeights: TNeuralNetWeights;
     function SexAsNNValue(const ASlot: TMonkeyMemorySlot): Double;
     procedure ClearMemorySlot(var ASlot: TMonkeyMemorySlot);
     procedure InitializeMemory;
@@ -126,6 +132,7 @@ type
     property Lifespan: Double read FLifespan write FLifespan;
     property Age: Integer read FAge;
     property VisionSlots: Integer read FVisionSlots;
+    property BrainWeights: TNeuralNetWeights read GetBrainWeights;
     property CurrentVision: TMonkeyVisionDecision read FCurrentVision;
     property MemoryCount: Integer read GetMemoryCount;
     property UnbornChild: TMonkey read FUnbornChild;
@@ -175,6 +182,7 @@ begin
   FStrength := EnsurePositive(AInit.Strength, 1);
   FLifespan := EnsurePositive(AInit.Lifespan, 1);
   FVisionSlots := EnsureAtLeast(AInit.VisionSlots, 1);
+  FBrainWeights := Copy(AInit.BrainWeights);
   FCurrentVision := TMonkeyVisionDecision.Default;
   InitializeMemory;
   FAge := 0;
@@ -220,8 +228,31 @@ var
   I: Integer;
   InputIndex: Integer;
 begin
-  SetLength(Result, Length(FMemory) * 2);
+  SetLength(Result, 5 + (Length(FMemory) * 2));
   InputIndex := 0;
+
+  if FLifespan > 0 then
+    Result[InputIndex] := FAge / FLifespan
+  else
+    Result[InputIndex] := 0;
+  Inc(InputIndex);
+
+  if FSex = msFemale then
+    Result[InputIndex] := 1
+  else
+    Result[InputIndex] := 0;
+  Inc(InputIndex);
+
+  Result[InputIndex] := FStrength;
+  Inc(InputIndex);
+  Result[InputIndex] := GetTotalStrength;
+  Inc(InputIndex);
+
+  if IsPregnant then
+    Result[InputIndex] := 1
+  else
+    Result[InputIndex] := 0;
+  Inc(InputIndex);
 
   for I := Low(FMemory) to High(FMemory) do
   begin
@@ -336,6 +367,11 @@ end;
 function TMonkey.GetIsPregnant: Boolean;
 begin
   Result := FPregnantTurnsRemaining > 0;
+end;
+
+function TMonkey.GetBrainWeights: TNeuralNetWeights;
+begin
+  Result := Copy(FBrainWeights);
 end;
 
 function TMonkey.GetMemoryCount: Integer;

@@ -5,7 +5,9 @@ uses
   FMX.Forms,
   UMonkeysForm in 'UMonkeysForm.pas' {TabbedForm},
   UWorld in 'UWorld.pas',
-  UMonkey in 'UMonkey.pas';
+  UMonkey in 'UMonkey.pas',
+  UNeuralNet in 'UNeuralNet.pas',
+  UNeuralNetFrame in 'UNeuralNetFrame.pas' {NeuralNetFrame: TFrame};
 
 {$R *.res}
 

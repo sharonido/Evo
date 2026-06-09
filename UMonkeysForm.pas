@@ -4,9 +4,10 @@ interface
 
 uses
   System.SysUtils, System.Types, System.UITypes, System.Classes, System.Variants,
-  FMX.Types, FMX.Graphics, FMX.Controls, FMX.Forms, FMX.Dialogs, FMX.TabControl,
-  FMX.StdCtrls, FMX.Gestures, FMX.Controls.Presentation, FMX.Layouts, FMX.Edit,
-  FMX.EditBox, FMX.NumberBox, FMX.Objects, UMonkey, UWorld;
+  System.Diagnostics, System.Math, FMX.Types, FMX.Graphics, FMX.Controls,
+  FMX.Forms, FMX.Dialogs, FMX.TabControl, FMX.StdCtrls, FMX.Gestures,
+  FMX.Controls.Presentation, FMX.Layouts, FMX.Edit, FMX.EditBox,
+  FMX.NumberBox, FMX.Objects, UMonkey, UNeuralNet, UNeuralNetFrame, UWorld;
 
 type
   TTabbedForm = class(TForm)
@@ -22,6 +23,7 @@ type
     BStep: TButton;
     LTurnSpeed: TLabel;
     TurnSpeedTrack: TTrackBar;
+    LStepTime: TLabel;
     ConfigGroup: TGroupBox;
     StatGroupBox: TGroupBox;
     NSizeX: TNumberBox;
@@ -47,20 +49,26 @@ type
     NPopulationCount: TNumberBox;
     LPopulationCount: TLabel;
     PWorldBoard: TPaintBox;
+    NeuralNetFrame1: TNeuralNetFrame;
     procedure FormCreate(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
+    procedure BPauseClick(Sender: TObject);
     procedure BResetClick(Sender: TObject);
     procedure BStepClick(Sender: TObject);
+    procedure BStartClick(Sender: TObject);
     procedure PWorldBoardMouseLeave(Sender: TObject);
     procedure PWorldBoardMouseMove(Sender: TObject; Shift: TShiftState; X,
       Y: Single);
+    procedure PWorldBoardMouseDown(Sender: TObject; Button: TMouseButton;
+      Shift: TShiftState; X, Y: Single);
     procedure PWorldBoardPaint(Sender: TObject; Canvas: TCanvas);
+    procedure TurnSpeedTrackChange(Sender: TObject);
   private
-    { Private declarations }
     FWorld: TWorld;
     FCellSize: Single;
     FMonkeyHoverBox: TRectangle;
     FMonkeyHoverText: TText;
+    FRunTimer: TTimer;
     function BuildWorldConfig: TWorldConfig;
     procedure CreateMonkeyHoverBox;
     procedure DrawMonkey(Canvas: TCanvas; const AX, AY: Integer;
@@ -69,10 +77,12 @@ type
     procedure HideMonkeyHoverBox;
     function MonkeySexToText(const ASex: TMonkeySex): string;
     procedure RestartBoard;
+    procedure RunWorldStep;
+    procedure RunTimerTimer(Sender: TObject);
     procedure ShowMonkeyHoverBox(const AX, AY: Single;
       const ATraits: TMonkeyTraitSnapshot);
+    procedure UpdateRunTimerInterval;
   public
-    { Public declarations }
   end;
 
 var
@@ -84,92 +94,44 @@ implementation
 
 procedure TTabbedForm.FormCreate(Sender: TObject);
 begin
-  { This defines the default active tab at runtime }
   TabControl.ActiveTab := WorldTab;
   FWorld := TWorld.Create;
+  FRunTimer := TTimer.Create(Self);
+  FRunTimer.Enabled := False;
+  FRunTimer.OnTimer := RunTimerTimer;
+  UpdateRunTimerInterval;
   CreateMonkeyHoverBox;
   RestartBoard;
 end;
 
 procedure TTabbedForm.FormDestroy(Sender: TObject);
 begin
+  FreeAndNil(FRunTimer);
   FreeAndNil(FMonkeyHoverBox);
   FreeAndNil(FWorld);
 end;
 
+procedure TTabbedForm.BPauseClick(Sender: TObject);
+begin
+  FRunTimer.Enabled := False;
+end;
+
 procedure TTabbedForm.BResetClick(Sender: TObject);
 begin
+  FRunTimer.Enabled := False;
   RestartBoard;
 end;
 
 procedure TTabbedForm.BStepClick(Sender: TObject);
 begin
-  FWorld.RunWorldTurn;
-  HideMonkeyHoverBox;
-  PWorldBoard.Repaint;
+  FRunTimer.Enabled := False;
+  RunWorldStep;
 end;
 
-procedure TTabbedForm.PWorldBoardMouseLeave(Sender: TObject);
+procedure TTabbedForm.BStartClick(Sender: TObject);
 begin
-  HideMonkeyHoverBox;
-end;
-
-procedure TTabbedForm.PWorldBoardMouseMove(Sender: TObject;
-  Shift: TShiftState; X, Y: Single);
-var
-  BoardX: Integer;
-  BoardY: Integer;
-  Traits: TMonkeyTraitSnapshot;
-begin
-  if FCellSize <= 0 then
-  begin
-    HideMonkeyHoverBox;
-    Exit;
-  end;
-
-  BoardX := Trunc(X / FCellSize);
-  BoardY := Trunc(Y / FCellSize);
-
-  if FWorld.TryGetMonkeyTraitsAt(BoardX, BoardY, Traits) then
-    ShowMonkeyHoverBox(X, Y, Traits)
-  else
-    HideMonkeyHoverBox;
-end;
-
-procedure TTabbedForm.PWorldBoardPaint(Sender: TObject; Canvas: TCanvas);
-var
-  X: Integer;
-  Y: Integer;
-  I: Integer;
-  CellRect: TRectF;
-  Monkeys: UWorld.TWorldMonkeySnapshots;
-begin
-  Canvas.Fill.Color := TAlphaColors.White;
-  Canvas.FillRect(PWorldBoard.LocalRect, 0, 0, [], 1);
-
-  if FWorld = nil then
-    Exit;
-
-  for Y := 0 to FWorld.SizeY - 1 do
-    for X := 0 to FWorld.SizeX - 1 do
-    begin
-      if Odd(X + Y) then
-        Canvas.Fill.Color := $FFF2F2F2
-      else
-        Canvas.Fill.Color := TAlphaColors.White;
-
-      CellRect := TRectF.Create(
-        X * FCellSize,
-        Y * FCellSize,
-        (X + 1) * FCellSize,
-        (Y + 1) * FCellSize);
-      Canvas.FillRect(CellRect, 0, 0, [], 1);
-    end;
-
-  Monkeys := FWorld.GetMonkeySnapshots;
-  for I := Low(Monkeys) to High(Monkeys) do
-    DrawMonkey(Canvas, Monkeys[I].X, Monkeys[I].Y, Monkeys[I].Sex,
-      Monkeys[I].IsPregnant);
+  UpdateRunTimerInterval;
+  FRunTimer.Enabled := True;
 end;
 
 function TTabbedForm.BuildWorldConfig: TWorldConfig;
@@ -242,10 +204,14 @@ begin
     'Sex: ' + MonkeySexToText(ATraits.Sex) + sLineBreak +
     Format('Mother Id: %d', [ATraits.MotherId]) + sLineBreak +
     Format('Father Id: %d', [ATraits.FatherId]) + sLineBreak +
-    Format('Maternal grandmother Id: %d', [ATraits.MaternalGrandmotherId]) + sLineBreak +
-    Format('Maternal grandfather Id: %d', [ATraits.MaternalGrandfatherId]) + sLineBreak +
-    Format('Paternal grandmother Id: %d', [ATraits.PaternalGrandmotherId]) + sLineBreak +
-    Format('Paternal grandfather Id: %d', [ATraits.PaternalGrandfatherId]) + sLineBreak +
+    Format('Maternal grandmother Id: %d',
+      [ATraits.MaternalGrandmotherId]) + sLineBreak +
+    Format('Maternal grandfather Id: %d',
+      [ATraits.MaternalGrandfatherId]) + sLineBreak +
+    Format('Paternal grandmother Id: %d',
+      [ATraits.PaternalGrandmotherId]) + sLineBreak +
+    Format('Paternal grandfather Id: %d',
+      [ATraits.PaternalGrandfatherId]) + sLineBreak +
     Format('Generation count: %d', [ATraits.GenCount]) + sLineBreak +
     Format('Strength: %.2f', [ATraits.Strength]) + sLineBreak +
     Format('Total strength: %.2f', [ATraits.TotalStrength]) + sLineBreak +
@@ -253,7 +219,8 @@ begin
     Format('Age: %d', [ATraits.Age]) + sLineBreak +
     Format('Vision slots: %d', [ATraits.VisionSlots]) + sLineBreak +
     Format('Memory slots: %d', [ATraits.MemoryCount]) + sLineBreak +
-    Format('Pregnant turns remaining: %d', [ATraits.PregnantTurnsRemaining]) + sLineBreak +
+    Format('Pregnant turns remaining: %d',
+      [ATraits.PregnantTurnsRemaining]) + sLineBreak +
     Format('Pregnant: %s', [BoolToStr(ATraits.IsPregnant, True)]) + sLineBreak +
     Format('Alive: %s', [BoolToStr(ATraits.Alive, True)]);
 end;
@@ -276,17 +243,130 @@ begin
   end;
 end;
 
+procedure TTabbedForm.PWorldBoardMouseDown(Sender: TObject;
+  Button: TMouseButton; Shift: TShiftState; X, Y: Single);
+var
+  BoardX: Integer;
+  BoardY: Integer;
+  Config: TNeuralNetConfig;
+  Inputs: TMonkeyNNInputs;
+  Outputs: TNeuralNetOutputs;
+  Traits: TMonkeyTraitSnapshot;
+  Weights: TNeuralNetWeights;
+begin
+  if Button <> TMouseButton.mbLeft then
+    Exit;
+  if FCellSize <= 0 then
+    Exit;
+
+  BoardX := Trunc(X / FCellSize);
+  BoardY := Trunc(Y / FCellSize);
+
+  if FWorld.TryGetMonkeyBrainAt(BoardX, BoardY, Config, Weights, Inputs,
+    Outputs) and FWorld.TryGetMonkeyTraitsAt(BoardX, BoardY, Traits) then
+  begin
+    NeuralNetFrame1.ShowMonkeyBrain(Traits, Config, Weights, Inputs, Outputs);
+    TabControl.ActiveTab := NNTab;
+    NeuralNetFrame1.ActivateGraphView;
+  end
+  else
+    NeuralNetFrame1.ClearMonkeyBrain;
+end;
+
+procedure TTabbedForm.PWorldBoardMouseLeave(Sender: TObject);
+begin
+  HideMonkeyHoverBox;
+end;
+
+procedure TTabbedForm.PWorldBoardMouseMove(Sender: TObject;
+  Shift: TShiftState; X, Y: Single);
+var
+  BoardX: Integer;
+  BoardY: Integer;
+  Traits: TMonkeyTraitSnapshot;
+begin
+  if FCellSize <= 0 then
+  begin
+    HideMonkeyHoverBox;
+    Exit;
+  end;
+
+  BoardX := Trunc(X / FCellSize);
+  BoardY := Trunc(Y / FCellSize);
+
+  if FWorld.TryGetMonkeyTraitsAt(BoardX, BoardY, Traits) then
+    ShowMonkeyHoverBox(X, Y, Traits)
+  else
+    HideMonkeyHoverBox;
+end;
+
+procedure TTabbedForm.PWorldBoardPaint(Sender: TObject; Canvas: TCanvas);
+var
+  X: Integer;
+  Y: Integer;
+  I: Integer;
+  CellRect: TRectF;
+  Monkeys: UWorld.TWorldMonkeySnapshots;
+begin
+  Canvas.Fill.Color := TAlphaColors.White;
+  Canvas.FillRect(PWorldBoard.LocalRect, 0, 0, [], 1);
+
+  if FWorld = nil then
+    Exit;
+
+  for Y := 0 to FWorld.SizeY - 1 do
+    for X := 0 to FWorld.SizeX - 1 do
+    begin
+      if Odd(X + Y) then
+        Canvas.Fill.Color := $FFF2F2F2
+      else
+        Canvas.Fill.Color := TAlphaColors.White;
+
+      CellRect := TRectF.Create(
+        X * FCellSize,
+        Y * FCellSize,
+        (X + 1) * FCellSize,
+        (Y + 1) * FCellSize);
+      Canvas.FillRect(CellRect, 0, 0, [], 1);
+    end;
+
+  Monkeys := FWorld.GetMonkeySnapshots;
+  for I := Low(Monkeys) to High(Monkeys) do
+    DrawMonkey(Canvas, Monkeys[I].X, Monkeys[I].Y, Monkeys[I].Sex,
+      Monkeys[I].IsPregnant);
+end;
+
 procedure TTabbedForm.RestartBoard;
 begin
   FWorld.Restart(BuildWorldConfig);
   HideMonkeyHoverBox;
+  NeuralNetFrame1.ClearMonkeyBrain;
+  LStepTime.Text := 'Step time: -';
   FCellSize := 16;
 
-  //PWorldBoard.Align := TAlignLayout.None;
   PWorldBoard.Position.X := 0;
   PWorldBoard.Position.Y := 0;
   PWorldBoard.Width := FWorld.SizeX * FCellSize;
   PWorldBoard.Height := FWorld.SizeY * FCellSize;
+  PWorldBoard.Repaint;
+end;
+
+procedure TTabbedForm.RunTimerTimer(Sender: TObject);
+begin
+  RunWorldStep;
+end;
+
+procedure TTabbedForm.RunWorldStep;
+var
+  Stopwatch: TStopwatch;
+begin
+  Stopwatch := TStopwatch.StartNew;
+  FWorld.RunWorldTurn;
+  Stopwatch.Stop;
+  LStepTime.Text := Format('Step time: %.3f ms',
+    [Stopwatch.Elapsed.TotalMilliseconds]);
+
+  HideMonkeyHoverBox;
   PWorldBoard.Repaint;
 end;
 
@@ -317,6 +397,22 @@ begin
   FMonkeyHoverBox.Position.Y := PopupPoint.Y;
   FMonkeyHoverBox.BringToFront;
   FMonkeyHoverBox.Visible := True;
+end;
+
+procedure TTabbedForm.TurnSpeedTrackChange(Sender: TObject);
+begin
+  UpdateRunTimerInterval;
+end;
+
+procedure TTabbedForm.UpdateRunTimerInterval;
+var
+  TurnsPerSecond: Double;
+begin
+  if FRunTimer = nil then
+    Exit;
+
+  TurnsPerSecond := Max(1, TurnSpeedTrack.Value);
+  FRunTimer.Interval := Max(1, Round(1000 / TurnsPerSecond));
 end;
 
 end.

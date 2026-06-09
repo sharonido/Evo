@@ -3,7 +3,7 @@ unit UWorld;
 interface
 
 uses
-  System.Generics.Collections, UMonkey;
+  System.Generics.Collections, UMonkey, UNeuralNet;
 
 type
   TWorldMonkeySnapshot = record
@@ -64,6 +64,7 @@ type
       const ASourceX, ASourceY, ARelativeX, ARelativeY: Integer);
     function AreCloseRelatives(const AFirst, ASecond: TMonkey): Boolean;
     function BoardIndex(const AX, AY: Integer): Integer;
+    function BuildNeuralNetConfig(const AVisionSlots: Integer): TNeuralNetConfig;
     function BuildVisionForMonkey(const AMonkey: TMonkey;
       const AVisionDecision: TMonkeyVisionDecision): TMonkeyVisionSlots;
     function CombatWinProbability(const AAttacker, ADefender: TMonkey): Double;
@@ -100,6 +101,9 @@ type
     function GetMonkeySnapshots: TWorldMonkeySnapshots;
     function TryGetMonkeyTraitsAt(const AX, AY: Integer;
       out ATraits: TMonkeyTraitSnapshot): Boolean;
+    function TryGetMonkeyBrainAt(const AX, AY: Integer;
+      out AConfig: TNeuralNetConfig; out AWeights: TNeuralNetWeights;
+      out AInputs: TMonkeyNNInputs; out AOutputs: TNeuralNetOutputs): Boolean;
     procedure Restart(const AConfig: TWorldConfig);
     procedure RunWorldTurn;
 
@@ -230,6 +234,20 @@ begin
   Result := (AY * FConfig.SizeX) + AX;
 end;
 
+function TWorld.BuildNeuralNetConfig(
+  const AVisionSlots: Integer): TNeuralNetConfig;
+var
+  LayerNodeCount: Integer;
+begin
+  LayerNodeCount := (EnsureAtLeast(AVisionSlots, 1) * 12) + 5;
+
+  Result.InputCount := LayerNodeCount;
+  Result.Hidden1Count := LayerNodeCount;
+  Result.Hidden2Count := LayerNodeCount;
+  Result.Hidden3Count := LayerNodeCount;
+  Result.OutputCount := 4;
+end;
+
 function TWorld.BuildVisionForMonkey(const AMonkey: TMonkey;
   const AVisionDecision: TMonkeyVisionDecision): TMonkeyVisionSlots;
 var
@@ -297,12 +315,16 @@ begin
   Init.Lifespan := MutateBySigmaPercent((AMother.Lifespan + AFather.Lifespan) /
     2, FConfig.MutationSigmaPercent);
   Init.VisionSlots := FConfig.VisionSlots;
+  Init.BrainWeights := TNeuralNet.CreateChildWeights(
+    BuildNeuralNetConfig(Init.VisionSlots), AMother.BrainWeights,
+    AFather.BrainWeights, Max(0, FConfig.MutationSigmaPercent) / 100);
 
   Result := TMonkey.Create(Init);
 end;
 
 procedure TWorld.ClearBoard;
 begin
+  SetLength(FBoard, 0);
   SetLength(FBoard, FConfig.SizeX * FConfig.SizeY);
 end;
 
@@ -337,6 +359,8 @@ begin
     Init.Lifespan := MutateBySigmaPercent(FConfig.BaseLifespan,
       FConfig.InitSigmaPercent);
     Init.VisionSlots := FConfig.VisionSlots;
+    Init.BrainWeights := TNeuralNet.CreateRandomWeights(
+      BuildNeuralNetConfig(Init.VisionSlots));
 
     Monkey := TMonkey.Create(Init);
     FMonkeys.Add(Monkey);
@@ -544,6 +568,45 @@ begin
   ATraits.Alive := Monkey.Alive;
 
   Result := True;
+end;
+
+function TWorld.TryGetMonkeyBrainAt(const AX, AY: Integer;
+  out AConfig: TNeuralNetConfig; out AWeights: TNeuralNetWeights;
+  out AInputs: TMonkeyNNInputs; out AOutputs: TNeuralNetOutputs): Boolean;
+var
+  I: Integer;
+  NeuralNetInputs: TNeuralNetOutputs;
+  Monkey: TMonkey;
+begin
+  Result := False;
+  AConfig.InputCount := 0;
+  AConfig.Hidden1Count := 0;
+  AConfig.Hidden2Count := 0;
+  AConfig.Hidden3Count := 0;
+  AConfig.OutputCount := 0;
+  SetLength(AWeights, 0);
+  SetLength(AInputs, 0);
+  SetLength(AOutputs, 0);
+
+  if not IsInsideBoard(AX, AY) then
+    Exit;
+
+  Monkey := FBoard[BoardIndex(AX, AY)];
+  if Monkey = nil then
+    Exit;
+
+  AConfig := BuildNeuralNetConfig(Monkey.VisionSlots);
+  AWeights := Monkey.BrainWeights;
+  AInputs := Monkey.BuildNNInput;
+  Result := (Length(AWeights) = TNeuralNet.WeightCount(AConfig)) and
+    (Length(AInputs) = AConfig.InputCount);
+  if Result then
+  begin
+    SetLength(NeuralNetInputs, Length(AInputs));
+    for I := Low(AInputs) to High(AInputs) do
+      NeuralNetInputs[I] := AInputs[I];
+    AOutputs := TNeuralNet.Evaluate(AConfig, AWeights, NeuralNetInputs);
+  end;
 end;
 
 function TWorld.GetSizeX: Integer;

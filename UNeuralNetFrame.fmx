@@ -1,0 +1,85 @@
+object NeuralNetFrame: TNeuralNetFrame
+  Size.Width = 1001.000000000000000000
+  Size.Height = 518.000000000000000000
+  Size.PlatformDefault = False
+  object NNTabControl: TTabControl
+    Align = Client
+    Size.Width = 1001.000000000000000000
+    Size.Height = 518.000000000000000000
+    Size.PlatformDefault = False
+    TabIndex = 0
+    TabOrder = 0
+    TabPosition = PlatformDefault
+    Sizes = (
+      1001s
+      513s
+      1001s
+      513s)
+    object TabNNView: TTabItem
+      CustomIcon = <
+        item
+        end>
+      IsSelected = True
+      Size.Width = 1.000000000000000000
+      Size.Height = 5.000000000000000000
+      Size.PlatformDefault = False
+      StyleLookup = ''
+      TabOrder = 0
+      Text = 'Graph View'
+      ExplicitSize.cx = 81.000000000000000000
+      ExplicitSize.cy = 26.000000000000000000
+      object GroupViewControl: TGroupBox
+        Align = MostRight
+        Position.X = 881.000000000000000000
+        Size.Width = 120.000000000000000000
+        Size.Height = 513.000000000000000000
+        Size.PlatformDefault = False
+        Text = 'View Control'
+        TabOrder = 0
+      end
+      object PaintBoxNNGraphView: TPaintBox
+        Align = Client
+        Size.Width = 881.000000000000000000
+        Size.Height = 513.000000000000000000
+        Size.PlatformDefault = False
+        OnMouseMove = PaintBoxNNGraphViewMouseMove
+        OnMouseLeave = PaintBoxNNGraphViewMouseLeave
+        OnPaint = PaintBoxNNGraphViewPaint
+      end
+    end
+    object TabNNJson: TTabItem
+      CustomIcon = <
+        item
+        end>
+      IsSelected = False
+      Size.Width = 1.000000000000000000
+      Size.Height = 5.000000000000000000
+      Size.PlatformDefault = False
+      StyleLookup = ''
+      TabOrder = 0
+      Text = 'Json'
+      ExplicitSize.cx = 44.000000000000000000
+      ExplicitSize.cy = 26.000000000000000000
+      object GroupBoxNNJsonControl: TGroupBox
+        Align = MostRight
+        Position.X = 881.000000000000000000
+        Size.Width = 120.000000000000000000
+        Size.Height = 513.000000000000000000
+        Size.PlatformDefault = False
+        Text = 'Json Control'
+        TabOrder = 0
+      end
+      object MemoJson: TMemo
+        Touch.InteractiveGestures = [Pan, LongTap, DoubleTap]
+        DataDetectorTypes = []
+        Align = Client
+        Size.Width = 881.000000000000000000
+        Size.Height = 513.000000000000000000
+        Size.PlatformDefault = False
+        TabOrder = 1
+        Viewport.Width = 881.000000000000000000
+        Viewport.Height = 513.000000000000000000
+      end
+    end
+  end
+end
