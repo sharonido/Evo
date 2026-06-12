@@ -7,7 +7,7 @@ uses
   System.Math, System.SysUtils, System.Types, System.UITypes, FMX.Controls,
   FMX.Forms, FMX.Graphics, FMX.Memo, FMX.Memo.Types, FMX.Objects,
   FMX.ScrollBox, FMX.StdCtrls, FMX.TabControl, FMX.Types, UMonkey,
-  UNeuralNet, UWorld, FMX.Controls.Presentation;
+  UNeuralNet, UWorld, FMX.Controls.Presentation, FMX.Dialogs;
 
 type
   TNeuralNetFrame = class(TFrame)
@@ -18,6 +18,7 @@ type
     TabNNJson: TTabItem;
     GroupBoxNNJsonControl: TGroupBox;
     MemoJson: TMemo;
+    BJsonSave: TButton;
     procedure PaintBoxNNGraphViewMouseLeave(Sender: TObject);
     procedure PaintBoxNNGraphViewMouseMove(Sender: TObject; Shift: TShiftState;
       X, Y: Single);
@@ -35,6 +36,7 @@ type
     FNNInputNodePositions: array of TPointF;
     FNNOutputNodePositions: array of TPointF;
     FNNInputNodeRadius: Single;
+    FNNOutputNodeRadius: Single;
     procedure ClearNodePositions;
     procedure CreateNNGraphInfoText;
     procedure CreateNNInputHoverBox;
@@ -50,6 +52,7 @@ type
       out AOutputIndex: Integer): Boolean;
     procedure UpdateMemoJson;
     procedure UpdateNNGraphInfoText;
+    function WinningOutputIndex(const AStartIndex, ACount: Integer): Integer;
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
@@ -92,6 +95,7 @@ begin
   SetLength(FNNInputNodePositions, 0);
   SetLength(FNNOutputNodePositions, 0);
   FNNInputNodeRadius := 0;
+  FNNOutputNodeRadius := 0;
 end;
 
 procedure TNeuralNetFrame.CreateNNGraphInfoText;
@@ -174,6 +178,7 @@ var
   MarginX: Single;
   MarginY: Single;
   NodeRadius: Single;
+  OutputNodeRadius: Single;
   MaxLayerCount: Integer;
   LayerIndex: Integer;
   NodeIndex: Integer;
@@ -343,24 +348,25 @@ var
 
   procedure DrawOutputLabels;
   const
-    OutputLabels: array[0..3] of string = (
-      'Movement', 'Mate', 'Far/Near', 'Vision Dir');
+    OutputLabels: array[0..12] of string = (
+      'Eid', 'Ago', 'SuperAgo', 'Mate', 'V:Range', 'V:N', 'V:NE', 'V:E',
+      'V:SE', 'V:S', 'V:SW', 'V:W', 'V:NW');
   var
     OutputIndex: Integer;
     LabelRect: TRectF;
   begin
     Canvas.Fill.Kind := TBrushKind.Solid;
     Canvas.Fill.Color := $FF333333;
-    Canvas.Font.Size := 13;
+    Canvas.Font.Size := 8;
     Canvas.Font.Style := [];
     for OutputIndex := Low(OutputLabels) to High(OutputLabels) do
       if OutputIndex < Length(LayerPositions[4]) then
       begin
         LabelRect := TRectF.Create(
-          LayerPositions[4][OutputIndex].X - 46,
-          LayerPositions[4][OutputIndex].Y + NodeRadius + 4,
-          LayerPositions[4][OutputIndex].X + 46,
-          LayerPositions[4][OutputIndex].Y + NodeRadius + 28);
+          LayerPositions[4][OutputIndex].X - 34,
+          LayerPositions[4][OutputIndex].Y + OutputNodeRadius + 8,
+          LayerPositions[4][OutputIndex].X + 34,
+          LayerPositions[4][OutputIndex].Y + OutputNodeRadius + 38);
         Canvas.FillText(LabelRect, OutputLabels[OutputIndex],
           False, 1, [], TTextAlign.Center, TTextAlign.Leading);
       end;
@@ -396,6 +402,7 @@ begin
   ContentWidth := Max(1, GraphRect.Width - (MarginX * 2));
   ContentHeight := Max(1, GraphRect.Height - MarginY - 48);
   NodeRadius := EnsureRange((ContentWidth / MaxLayerCount) * 0.3, 2, 7);
+  OutputNodeRadius := Max(NodeRadius * 3, 12);
 
   BuildLayerPositions;
   SetLength(FNNInputNodePositions, Length(LayerPositions[0]));
@@ -405,6 +412,7 @@ begin
   for InputNodeIndex := Low(LayerPositions[4]) to High(LayerPositions[4]) do
     FNNOutputNodePositions[InputNodeIndex] := LayerPositions[4][InputNodeIndex];
   FNNInputNodeRadius := NodeRadius;
+  FNNOutputNodeRadius := OutputNodeRadius;
 
   WeightIndex := 0;
   Threshold := CalculateLayerThreshold(WeightIndex, 0, 1);
@@ -420,13 +428,36 @@ begin
   Canvas.Stroke.Thickness := 1;
   for LayerIndex := Low(LayerCounts) to High(LayerCounts) do
   begin
-    Canvas.Fill.Color := LayerColor(LayerIndex);
     for NodeIndex := 0 to LayerCounts[LayerIndex] - 1 do
-      Canvas.FillEllipse(TRectF.Create(
-        LayerPositions[LayerIndex][NodeIndex].X - NodeRadius,
-        LayerPositions[LayerIndex][NodeIndex].Y - NodeRadius,
-        LayerPositions[LayerIndex][NodeIndex].X + NodeRadius,
-        LayerPositions[LayerIndex][NodeIndex].Y + NodeRadius), 1);
+    begin
+      Canvas.Fill.Color := LayerColor(LayerIndex);
+      if (LayerIndex = 4) and
+        (((NodeIndex >= 0) and (NodeIndex <= 2) and
+        (NodeIndex = WinningOutputIndex(0, 3))) or
+        ((NodeIndex >= 5) and (NodeIndex <= 12) and
+        (NodeIndex = WinningOutputIndex(5, 8) + 5))) then
+        Canvas.Fill.Color := TAlphaColors.Black;
+
+      if LayerIndex = 4 then
+      begin
+        Canvas.FillEllipse(TRectF.Create(
+          LayerPositions[LayerIndex][NodeIndex].X - OutputNodeRadius,
+          LayerPositions[LayerIndex][NodeIndex].Y - OutputNodeRadius,
+          LayerPositions[LayerIndex][NodeIndex].X + OutputNodeRadius,
+          LayerPositions[LayerIndex][NodeIndex].Y + OutputNodeRadius), 1);
+        Canvas.DrawEllipse(TRectF.Create(
+          LayerPositions[LayerIndex][NodeIndex].X - OutputNodeRadius,
+          LayerPositions[LayerIndex][NodeIndex].Y - OutputNodeRadius,
+          LayerPositions[LayerIndex][NodeIndex].X + OutputNodeRadius,
+          LayerPositions[LayerIndex][NodeIndex].Y + OutputNodeRadius), 1);
+      end
+      else
+        Canvas.FillEllipse(TRectF.Create(
+          LayerPositions[LayerIndex][NodeIndex].X - NodeRadius,
+          LayerPositions[LayerIndex][NodeIndex].Y - NodeRadius,
+          LayerPositions[LayerIndex][NodeIndex].X + NodeRadius,
+          LayerPositions[LayerIndex][NodeIndex].Y + NodeRadius), 1);
+    end;
   end;
 
   DrawInputLabels;
@@ -541,11 +572,15 @@ end;
 procedure TNeuralNetFrame.ShowNNInputHoverBox(const AInputIndex: Integer);
 var
   OutputIndex: Integer;
+  WinnerIndex: Integer;
   DirectionValue: Integer;
   PopupPoint: TPointF;
 begin
   if (FNNInputHoverBox = nil) or (FNNInputHoverText = nil) then
     Exit;
+
+  if FNNInputHoverBox.Parent <> PaintBoxNNGraphView then
+    FNNInputHoverBox.Parent := PaintBoxNNGraphView;
 
   if AInputIndex >= 0 then
   begin
@@ -563,44 +598,44 @@ begin
     if (OutputIndex < 0) or (OutputIndex >= Length(FSelectedNNOutputs)) then
       Exit;
 
-    case OutputIndex of
-      0:
-        begin
-          DirectionValue := EnsureRange(Round(FSelectedNNOutputs[OutputIndex] *
-            8), 0, 8);
-          FNNInputHoverText.Text := 'Output: movement option' + sLineBreak +
-            Format('Decoded: %d = %s', [DirectionValue,
-            DirectionOptionText(DirectionValue)]);
-        end;
-      1:
-        begin
-          if FSelectedNNOutputs[OutputIndex] >= 0.5 then
-            FNNInputHoverText.Text := 'Output: mate yes/no' + sLineBreak +
-              'Decoded: yes'
-          else
-            FNNInputHoverText.Text := 'Output: mate yes/no' + sLineBreak +
-              'Decoded: no';
-        end;
-      2:
-        begin
-          if FSelectedNNOutputs[OutputIndex] >= 0.5 then
-            FNNInputHoverText.Text := 'Output: vision far/near' + sLineBreak +
-              'Decoded: far'
-          else
-            FNNInputHoverText.Text := 'Output: vision far/near' + sLineBreak +
-              'Decoded: near';
-        end;
-      3:
-        begin
-          DirectionValue := EnsureRange(Round(FSelectedNNOutputs[OutputIndex] *
-            7) + 1, 1, 8);
-          FNNInputHoverText.Text := 'Output: vision direction' + sLineBreak +
-            Format('Decoded: %d = %s', [DirectionValue,
-            DirectionOptionText(DirectionValue)]);
-        end;
+    if (OutputIndex >= 0) and (OutputIndex <= 2) then
+    begin
+      WinnerIndex := WinningOutputIndex(0, 3);
+      FNNInputHoverText.Text :=
+        Format('Output: strategy %d', [OutputIndex]) + sLineBreak +
+        Format('Winner strategy index: %d', [WinnerIndex]);
+    end
+    else if OutputIndex = 3 then
+    begin
+      if FSelectedNNOutputs[OutputIndex] >= 0.5 then
+        FNNInputHoverText.Text := 'Output: mate yes/no' + sLineBreak +
+          'Decoded: yes'
+      else
+        FNNInputHoverText.Text := 'Output: mate yes/no' + sLineBreak +
+          'Decoded: no';
+    end
+    else if OutputIndex = 4 then
+    begin
+      if FSelectedNNOutputs[OutputIndex] >= 0.5 then
+        FNNInputHoverText.Text := 'Output: vision far/near' + sLineBreak +
+          'Decoded: far'
+      else
+        FNNInputHoverText.Text := 'Output: vision far/near' + sLineBreak +
+          'Decoded: near';
+    end
+    else if (OutputIndex >= 5) and (OutputIndex <= 12) then
+    begin
+      WinnerIndex := WinningOutputIndex(5, 8) + 5;
+      DirectionValue := OutputIndex - 4;
+      FNNInputHoverText.Text :=
+        Format('Output: vision direction %d = %s', [DirectionValue,
+        DirectionOptionText(DirectionValue)]) + sLineBreak +
+        Format('Winner: %d = %s', [WinnerIndex - 4,
+        DirectionOptionText(WinnerIndex - 4)]);
+    end
     else
       FNNInputHoverText.Text := 'Output';
-    end;
+
     FNNInputHoverText.Text := FNNInputHoverText.Text + sLineBreak +
       Format('Output index: %d', [OutputIndex]) + sLineBreak +
       Format('Value: %.5f', [FSelectedNNOutputs[OutputIndex]]);
@@ -608,7 +643,7 @@ begin
 
   PopupPoint := TPointF.Create(
     (PaintBoxNNGraphView.Width - FNNInputHoverBox.Width) / 2,
-    PaintBoxNNGraphView.Height / 2);
+    Max(220, PaintBoxNNGraphView.Height / 2));
 
   if PopupPoint.X + FNNInputHoverBox.Width > PaintBoxNNGraphView.Width - 8 then
     PopupPoint.X := PaintBoxNNGraphView.Width - FNNInputHoverBox.Width - 8;
@@ -634,7 +669,7 @@ begin
   if not FHasSelectedNNGraph then
     Exit;
 
-  HitRadius := Max(FNNInputNodeRadius + 4, 7);
+  HitRadius := Max(FNNOutputNodeRadius + 4, 7);
   for I := Low(FNNInputNodePositions) to High(FNNInputNodePositions) do
     if (Sqr(AX - FNNInputNodePositions[I].X) +
       Sqr(AY - FNNInputNodePositions[I].Y)) <= Sqr(HitRadius) then
@@ -691,6 +726,7 @@ begin
       'Green: positive weight' + sLineBreak +
       'Red: negative weight' + sLineBreak +
       'Thickness: weight strength' + sLineBreak +
+      'Black output: winner' + sLineBreak +
       'Strongest 5% per layer'
   else
     FNNGraphInfoText.Text :=
@@ -700,7 +736,28 @@ begin
       'Green: positive weight' + sLineBreak +
       'Red: negative weight' + sLineBreak +
       'Thickness: weight strength' + sLineBreak +
+      'Black output: winner' + sLineBreak +
       'Strongest 5% per layer';
+end;
+
+function TNeuralNetFrame.WinningOutputIndex(const AStartIndex,
+  ACount: Integer): Integer;
+var
+  I: Integer;
+  WinnerValue: Double;
+begin
+  Result := 0;
+  if (ACount <= 0) or (AStartIndex < 0) or
+    (AStartIndex + ACount > Length(FSelectedNNOutputs)) then
+    Exit;
+
+  WinnerValue := FSelectedNNOutputs[AStartIndex];
+  for I := 1 to ACount - 1 do
+    if FSelectedNNOutputs[AStartIndex + I] > WinnerValue then
+    begin
+      Result := I;
+      WinnerValue := FSelectedNNOutputs[AStartIndex + I];
+    end;
 end;
 
 end.

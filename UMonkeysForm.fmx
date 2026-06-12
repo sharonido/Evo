@@ -2,7 +2,7 @@ object TabbedForm: TTabbedForm
   Left = 0
   Top = 0
   Caption = 'Monkeys evolution program'
-  ClientHeight = 567
+  ClientHeight = 843
   ClientWidth = 1001
   FormFactor.Width = 1440
   FormFactor.Height = 900
@@ -14,26 +14,26 @@ object TabbedForm: TTabbedForm
     Align = Client
     FullSize = True
     Size.Width = 1001.000000000000000000
-    Size.Height = 567.000000000000000000
+    Size.Height = 843.000000000000000000
     Size.PlatformDefault = False
     TabHeight = 49.000000000000000000
-    TabIndex = 2
+    TabIndex = 0
     TabOrder = 0
     TabPosition = PlatformDefault
     Sizes = (
       1001s
-      518s
+      794s
       1001s
-      518s
+      794s
       1001s
-      518s)
+      794s)
     object WorldTab: TTabItem
       CustomIcon = <
         item
         end>
       TextSettings.Font.StyleExt = {00070000000000000004000000}
       StyledSettings = [Family, Size, FontColor]
-      IsSelected = False
+      IsSelected = True
       Size.Width = 333.000000000000000000
       Size.Height = 49.000000000000000000
       Size.PlatformDefault = False
@@ -46,43 +46,60 @@ object TabbedForm: TTabbedForm
         Align = MostRight
         Position.X = 828.000000000000000000
         Size.Width = 173.000000000000000000
-        Size.Height = 518.000000000000000000
+        Size.Height = 794.000000000000000000
         Size.PlatformDefault = False
         Text = 'Basic Controls'
         TabOrder = 0
+        object RoundRect1: TRoundRect
+          Position.X = 8.000000000000000000
+          Position.Y = 173.000000000000000000
+          Size.Width = 157.000000000000000000
+          Size.Height = 29.000000000000000000
+          Size.PlatformDefault = False
+        end
         object BStart: TButton
           Position.X = 16.000000000000000000
           Position.Y = 24.000000000000000000
           TabOrder = 38
-          Text = 'Run'
+          Text = #9654' Run'
           OnClick = BStartClick
         end
         object BPause: TButton
           Position.X = 16.000000000000000000
           Position.Y = 64.000000000000000000
           TabOrder = 39
-          Text = 'Pause'
+          Text = '   '#9208' Pause'
           OnClick = BPauseClick
         end
         object BReset: TButton
           Position.X = 16.000000000000000000
           Position.Y = 104.000000000000000000
           TabOrder = 40
-          Text = 'Reset'
+          Text = ' '#9209' Stop'
           OnClick = BResetClick
         end
         object BStep: TButton
           Position.X = 16.000000000000000000
           Position.Y = 144.000000000000000000
           TabOrder = 41
-          Text = 'Step'
+          Text = ' '#9197' Step'
           OnClick = BStepClick
+        end
+        object BMaxSpeed: TSpeedButton
+          StaysPressed = True
+          Position.X = 16.000000000000000000
+          Position.Y = 176.000000000000000000
+          Size.Width = 140.000000000000000000
+          Size.Height = 22.000000000000000000
+          Size.PlatformDefault = False
+          Text = 'Max speed'
+          OnClick = BMaxSpeedClick
         end
         object LTurnSpeed: TLabel
           Position.X = 16.000000000000000000
           Position.Y = 200.000000000000000000
           Text = 'Turn speed'
-          TabOrder = 42
+          TabOrder = 43
         end
         object TurnSpeedTrack: TTrackBar
           CanParentFocus = True
@@ -93,7 +110,7 @@ object TabbedForm: TTabbedForm
           Size.Width = 140.000000000000000000
           Size.Height = 19.000000000000000000
           Size.PlatformDefault = False
-          TabOrder = 43
+          TabOrder = 44
           Value = 1.000000000000000000
           OnChange = TurnSpeedTrackChange
         end
@@ -104,17 +121,98 @@ object TabbedForm: TTabbedForm
           Size.Height = 17.000000000000000000
           Size.PlatformDefault = False
           Text = 'Step time: -'
-          TabOrder = 44
+          TabOrder = 45
+        end
+        object LGameCount: TLabel
+          Position.X = 16.000000000000000000
+          Position.Y = 276.000000000000000000
+          Size.Width = 180.000000000000000000
+          Size.Height = 17.000000000000000000
+          Size.PlatformDefault = False
+          Text = 'Games: 0'
+          TabOrder = 46
+        end
+        object LWorldStepCount: TLabel
+          Position.X = 16.000000000000000000
+          Position.Y = 308.000000000000000000
+          Size.Width = 140.000000000000000000
+          Size.Height = 17.000000000000000000
+          Size.PlatformDefault = False
+          Text = 'Steps: 0'
+          TabOrder = 47
+        end
+        object LLiveMonkeyCount: TLabel
+          Position.X = 16.000000000000000000
+          Position.Y = 332.000000000000000000
+          Size.Width = 140.000000000000000000
+          Size.Height = 17.000000000000000000
+          Size.PlatformDefault = False
+          Text = 'Live monkeys: 0'
+          TabOrder = 48
+        end
+        object LDeadMonkeyCount: TLabel
+          Position.X = 16.000000000000000000
+          Position.Y = 356.000000000000000000
+          Size.Width = 140.000000000000000000
+          Size.Height = 17.000000000000000000
+          Size.PlatformDefault = False
+          Text = 'Dead monkeys: 0'
+          TabOrder = 49
+        end
+        object LCombatDeathCount: TLabel
+          Position.X = 16.000000000000000000
+          Position.Y = 380.000000000000000000
+          Size.Width = 140.000000000000000000
+          Size.Height = 17.000000000000000000
+          Size.PlatformDefault = False
+          Text = 'Combat deaths: 0'
+          TabOrder = 50
+        end
+        object LBornMonkeyCount: TLabel
+          Position.X = 16.000000000000000000
+          Position.Y = 404.000000000000000000
+          Size.Width = 140.000000000000000000
+          Size.Height = 17.000000000000000000
+          Size.PlatformDefault = False
+          Text = 'Born monkeys: 0'
+          TabOrder = 51
+        end
+        object LLivingMaxGen: TLabel
+          Position.X = 16.000000000000000000
+          Position.Y = 428.000000000000000000
+          Size.Width = 180.000000000000000000
+          Size.Height = 17.000000000000000000
+          Size.PlatformDefault = False
+          Text = 'Living max gen: none'
+          TabOrder = 52
+        end
+        object LMaxGen: TLabel
+          Position.X = 16.000000000000000000
+          Position.Y = 452.000000000000000000
+          Size.Width = 180.000000000000000000
+          Size.Height = 17.000000000000000000
+          Size.PlatformDefault = False
+          Text = 'Max gen: none'
+          TabOrder = 53
+        end
+        object LAllGamesMaxGen: TLabel
+          Position.X = 16.000000000000000000
+          Position.Y = 476.000000000000000000
+          Size.Width = 180.000000000000000000
+          Size.Height = 17.000000000000000000
+          Size.PlatformDefault = False
+          Text = 'All games max gen: none'
+          TabOrder = 54
         end
       end
       object ScrollBox1: TScrollBox
         Align = Client
         Size.Width = 828.000000000000000000
-        Size.Height = 518.000000000000000000
+        Size.Height = 794.000000000000000000
         Size.PlatformDefault = False
         TabOrder = 1
         Viewport.Width = 828.000000000000000000
-        Viewport.Height = 518.000000000000000000
+        Viewport.Height = 794.000000000000000000
         object PWorldBoard: TPaintBox
           Size.Width = 608.000000000000000000
           Size.Height = 518.000000000000000000
@@ -144,7 +242,7 @@ object TabbedForm: TTabbedForm
       object ConfigGroup: TGroupBox
         Align = MostLeft
         Size.Width = 385.000000000000000000
-        Size.Height = 518.000000000000000000
+        Size.Height = 794.000000000000000000
         Size.PlatformDefault = False
         Text = 'Configuration'
         TabOrder = 1
@@ -306,7 +404,7 @@ object TabbedForm: TTabbedForm
       object StatGroupBox: TGroupBox
         Align = Client
         Size.Width = 616.000000000000000000
-        Size.Height = 518.000000000000000000
+        Size.Height = 794.000000000000000000
         Size.PlatformDefault = False
         Text = 'Statistics'
         TabOrder = 0
@@ -318,7 +416,7 @@ object TabbedForm: TTabbedForm
         end>
       TextSettings.Font.StyleExt = {00070000000000000004000000}
       StyledSettings = [Family, Size, FontColor]
-      IsSelected = True
+      IsSelected = False
       Size.Width = 333.000000000000000000
       Size.Height = 49.000000000000000000
       Size.PlatformDefault = False
@@ -330,10 +428,47 @@ object TabbedForm: TTabbedForm
       inline NeuralNetFrame1: TNeuralNetFrame
         Align = Client
         Size.Width = 1001.000000000000000000
-        Size.Height = 518.000000000000000000
+        Size.Height = 794.000000000000000000
         Size.PlatformDefault = False
         TabOrder = 0
+        inherited TabControl1: TTabControl
+          Size.Height = 794.000000000000000000
+          Sizes = (
+            1001s
+            768s
+            1001s
+            768s)
+          inherited TabNNView: TTabItem
+            ExplicitSize.cx = 81.000000000000000000
+            ExplicitSize.cy = 26.000000000000000000
+            inherited GroupViewControl: TGroupBox
+              Size.Height = 768.000000000000000000
+            end
+            inherited PaintBoxNNGraphView: TPaintBox
+              Size.Height = 768.000000000000000000
+            end
+          end
+          inherited TabNNJson: TTabItem
+            ExplicitSize.cx = 44.000000000000000000
+            ExplicitSize.cy = 26.000000000000000000
+            inherited GroupBoxNNJsonControl: TGroupBox
+              Size.Height = 768.000000000000000000
+              inherited BJsonSave: TButton
+                TabOrder = 38
+              end
+            end
+            inherited MemoJson: TMemo
+              Size.Height = 768.000000000000000000
+              Viewport.Width = 881.000000000000000000
+              Viewport.Height = 768.000000000000000000
+            end
+          end
+        end
       end
     end
+  end
+  object SaveDjson: TSaveDialog
+    Left = 916
+    Top = 1
   end
 end

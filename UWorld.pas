@@ -59,6 +59,14 @@ type
     FMonkeys: TObjectList<TMonkey>;
     FBoard: TMonkeyBoard;
     FNextMonkeyId: TMonkeyId;
+    FWorldStepCount: Int64;
+    FDeadMonkeyCount: Int64;
+    FCombatDeathCount: Int64;
+    FBornMonkeyCount: Int64;
+    FMaxGenCount: Integer;
+    FMaxGenMonkeyId: TMonkeyId;
+    FGenerationEnded: Boolean;
+    FLastSurvivorWeightsJson: string;
     class function EnsureAtLeast(const AValue, AMinimum: Integer): Integer; static;
     procedure AddVisionSlot(var AVisionSlots: TMonkeyVisionSlots;
       const ASourceX, ASourceY, ARelativeX, ARelativeY: Integer);
@@ -70,17 +78,25 @@ type
     function CombatWinProbability(const AAttacker, ADefender: TMonkey): Double;
     function CreateOffspring(const AMother, AFather: TMonkey): TMonkey;
     procedure ClearBoard;
-    procedure CreateInitialPopulation;
+    procedure CreateInitialPopulation(const ASeedWeights: TNeuralNetWeights);
     function FindEmptyCellNear(const ACenterX, ACenterY: Integer; out AX,
       AY: Integer): Boolean;
     function FindRandomEmptyCell(out AX, AY: Integer): Boolean;
+    function FindMonkeyById(const AMonkeyId: TMonkeyId): TMonkey;
     function FindMonkeyPosition(const AMonkey: TMonkey; out AX, AY: Integer): Boolean;
+    procedure FindLivingMaxGeneration(out AGenCount: Integer;
+      out AMonkeyId: TMonkeyId);
+    function GetLivingMaxGenCount: Integer;
+    function GetLivingMaxGenMonkeyId: TMonkeyId;
     function GetMonkeyCount: Integer;
     function GetSizeX: Integer;
     function GetSizeY: Integer;
     function IsInsideBoard(const AX, AY: Integer): Boolean;
+    function LoadSeedWeightsFromJsonFile(const AFileName: string;
+      const AVisionSlots: Integer): TNeuralNetWeights;
     function MonkeyPriority(const AMonkey: TMonkey): Double;
     function MutateBySigmaPercent(const ABaseValue, ASigmaPercent: Double): Double;
+    function MutateWeights(const ABaseWeights: TNeuralNetWeights): TNeuralNetWeights;
     function RandomGaussian: Double;
     procedure ActivateMonkey(const AMonkey: TMonkey);
     procedure DirectionToDelta(const ADirection: Integer; out ADeltaX, ADeltaY: Integer);
@@ -94,6 +110,7 @@ type
       const AAction: TMonkeyActionDecision);
     procedure ShuffleMonkeys;
     procedure SortMonkeysForTurn;
+    procedure TrackMaxGeneration(const AMonkey: TMonkey);
   public
     constructor Create;
     destructor Destroy; override;
@@ -104,11 +121,28 @@ type
     function TryGetMonkeyBrainAt(const AX, AY: Integer;
       out AConfig: TNeuralNetConfig; out AWeights: TNeuralNetWeights;
       out AInputs: TMonkeyNNInputs; out AOutputs: TNeuralNetOutputs): Boolean;
+    function TryGetMonkeyWeightsJson(const AMonkeyId: TMonkeyId;
+      out AJson: string): Boolean;
     procedure Restart(const AConfig: TWorldConfig);
+    procedure RestartFromWeightsFile(const AConfig: TWorldConfig;
+      const AFileName: string);
     procedure RunWorldTurn;
+    procedure SaveLastSurvivorWeightsJsonToFile(const AFileName: string);
+    procedure SaveMonkeyWeightsJsonToFile(const AMonkeyId: TMonkeyId;
+      const AFileName: string);
 
     property Config: TWorldConfig read FConfig;
     property MonkeyCount: Integer read GetMonkeyCount;
+    property WorldStepCount: Int64 read FWorldStepCount;
+    property DeadMonkeyCount: Int64 read FDeadMonkeyCount;
+    property CombatDeathCount: Int64 read FCombatDeathCount;
+    property BornMonkeyCount: Int64 read FBornMonkeyCount;
+    property LivingMaxGenCount: Integer read GetLivingMaxGenCount;
+    property LivingMaxGenMonkeyId: TMonkeyId read GetLivingMaxGenMonkeyId;
+    property MaxGenCount: Integer read FMaxGenCount;
+    property MaxGenMonkeyId: TMonkeyId read FMaxGenMonkeyId;
+    property GenerationEnded: Boolean read FGenerationEnded;
+    property LastSurvivorWeightsJson: string read FLastSurvivorWeightsJson;
     property SizeX: Integer read GetSizeX;
     property SizeY: Integer read GetSizeY;
   end;
@@ -116,7 +150,8 @@ type
 implementation
 
 uses
-  System.Generics.Defaults, System.Math, System.SysUtils;
+  System.Generics.Defaults, System.IOUtils, System.Math, System.SysUtils,
+  System.Types;
 
 { TWorld }
 
@@ -193,7 +228,7 @@ begin
 
   AVisionSlots[SlotIndex].State := mcsOccupied;
   AVisionSlots[SlotIndex].Sex := Monkey.Sex;
-  AVisionSlots[SlotIndex].Strength := Monkey.Strength;
+  AVisionSlots[SlotIndex].Strength := Monkey.TotalStrength;
 end;
 
 function TWorld.AreCloseRelatives(const AFirst, ASecond: TMonkey): Boolean;
@@ -245,40 +280,117 @@ begin
   Result.Hidden1Count := LayerNodeCount;
   Result.Hidden2Count := LayerNodeCount;
   Result.Hidden3Count := LayerNodeCount;
-  Result.OutputCount := 4;
+  Result.OutputCount := 13;
 end;
 
 function TWorld.BuildVisionForMonkey(const AMonkey: TMonkey;
   const AVisionDecision: TMonkeyVisionDecision): TMonkeyVisionSlots;
 var
+  Candidates: TList<TPoint>;
+  Candidate: TPoint;
+  DirectionX: Integer;
+  DirectionY: Integer;
   MonkeyX: Integer;
   MonkeyY: Integer;
   Radius: Integer;
-  RelativeX: Integer;
-  RelativeY: Integer;
+  SearchRadius: Integer;
+
+  procedure AddCandidate(const ARelativeX, ARelativeY: Integer);
+  begin
+    if (ARelativeX = 0) and (ARelativeY = 0) then
+      Exit;
+    Candidates.Add(TPoint.Create(ARelativeX, ARelativeY));
+  end;
+
+  procedure BuildNearCandidates;
+  var
+    LocalRelativeX: Integer;
+    LocalRelativeY: Integer;
+  begin
+    Radius := 1;
+    while Candidates.Count < AMonkey.VisionSlots do
+    begin
+      for LocalRelativeY := -Radius to Radius do
+        for LocalRelativeX := -Radius to Radius do
+        begin
+          if Max(Abs(LocalRelativeX), Abs(LocalRelativeY)) <> Radius then
+            Continue;
+          AddCandidate(LocalRelativeX, LocalRelativeY);
+        end;
+      Inc(Radius);
+    end;
+
+    Candidates.Sort(TComparer<TPoint>.Construct(
+      function(const Left, Right: TPoint): Integer
+      begin
+        Result := CompareValue(Max(Abs(Left.X), Abs(Left.Y)),
+          Max(Abs(Right.X), Abs(Right.Y)));
+        if Result <> 0 then
+          Exit;
+
+        Result := CompareValue(-(Left.X * DirectionX + Left.Y * DirectionY),
+          -(Right.X * DirectionX + Right.Y * DirectionY));
+        if Result <> 0 then
+          Exit;
+
+        Result := CompareValue(Abs(Left.X * DirectionY - Left.Y * DirectionX),
+          Abs(Right.X * DirectionY - Right.Y * DirectionX));
+      end));
+  end;
+
+  procedure BuildFarCandidates;
+  var
+    LocalRelativeX: Integer;
+    LocalRelativeY: Integer;
+  begin
+    SearchRadius := Max(3, AMonkey.VisionSlots * 2);
+    for LocalRelativeY := -SearchRadius to SearchRadius do
+      for LocalRelativeX := -SearchRadius to SearchRadius do
+        if (LocalRelativeX * DirectionX + LocalRelativeY * DirectionY) > 0 then
+          AddCandidate(LocalRelativeX, LocalRelativeY);
+
+    Candidates.Sort(TComparer<TPoint>.Construct(
+      function(const Left, Right: TPoint): Integer
+      begin
+        Result := CompareValue(-(Left.X * DirectionX + Left.Y * DirectionY),
+          -(Right.X * DirectionX + Right.Y * DirectionY));
+        if Result <> 0 then
+          Exit;
+
+        Result := CompareValue(Abs(Left.X * DirectionY - Left.Y * DirectionX),
+          Abs(Right.X * DirectionY - Right.Y * DirectionX));
+        if Result <> 0 then
+          Exit;
+
+        Result := CompareValue(Max(Abs(Left.X), Abs(Left.Y)),
+          Max(Abs(Right.X), Abs(Right.Y)));
+      end));
+  end;
 begin
   SetLength(Result, 0);
 
   if not FindMonkeyPosition(AMonkey, MonkeyX, MonkeyY) then
     Exit;
 
-  Radius := 1;
-  while Length(Result) < AMonkey.VisionSlots do
-  begin
-    for RelativeY := -Radius to Radius do
-      for RelativeX := -Radius to Radius do
-      begin
-        if (RelativeX = 0) and (RelativeY = 0) then
-          Continue;
-        if Max(Abs(RelativeX), Abs(RelativeY)) <> Radius then
-          Continue;
+  DirectionToDelta(AVisionDecision.Direction, DirectionX, DirectionY);
+  if (DirectionX = 0) and (DirectionY = 0) then
+    DirectionY := -1;
 
-        AddVisionSlot(Result, MonkeyX, MonkeyY, RelativeX, RelativeY);
-        if Length(Result) >= AMonkey.VisionSlots then
-          Exit;
-      end;
+  Candidates := TList<TPoint>.Create;
+  try
+    if AVisionDecision.IsFar then
+      BuildFarCandidates
+    else
+      BuildNearCandidates;
 
-    Inc(Radius);
+    for Candidate in Candidates do
+    begin
+      AddVisionSlot(Result, MonkeyX, MonkeyY, Candidate.X, Candidate.Y);
+      if Length(Result) >= AMonkey.VisionSlots then
+        Exit;
+    end;
+  finally
+    Candidates.Free;
   end;
 end;
 
@@ -320,6 +432,7 @@ begin
     AFather.BrainWeights, Max(0, FConfig.MutationSigmaPercent) / 100);
 
   Result := TMonkey.Create(Init);
+  TrackMaxGeneration(Result);
 end;
 
 procedure TWorld.ClearBoard;
@@ -328,7 +441,7 @@ begin
   SetLength(FBoard, FConfig.SizeX * FConfig.SizeY);
 end;
 
-procedure TWorld.CreateInitialPopulation;
+procedure TWorld.CreateInitialPopulation(const ASeedWeights: TNeuralNetWeights);
 var
   I: Integer;
   X: Integer;
@@ -359,10 +472,15 @@ begin
     Init.Lifespan := MutateBySigmaPercent(FConfig.BaseLifespan,
       FConfig.InitSigmaPercent);
     Init.VisionSlots := FConfig.VisionSlots;
-    Init.BrainWeights := TNeuralNet.CreateRandomWeights(
-      BuildNeuralNetConfig(Init.VisionSlots));
+    if Length(ASeedWeights) = TNeuralNet.WeightCount(
+      BuildNeuralNetConfig(Init.VisionSlots)) then
+      Init.BrainWeights := MutateWeights(ASeedWeights)
+    else
+      Init.BrainWeights := TNeuralNet.CreateRandomWeights(
+        BuildNeuralNetConfig(Init.VisionSlots));
 
     Monkey := TMonkey.Create(Init);
+    TrackMaxGeneration(Monkey);
     FMonkeys.Add(Monkey);
     FBoard[BoardIndex(X, Y)] := Monkey;
   end;
@@ -486,6 +604,16 @@ begin
       end;
 end;
 
+function TWorld.FindMonkeyById(const AMonkeyId: TMonkeyId): TMonkey;
+var
+  Monkey: TMonkey;
+begin
+  Result := nil;
+  for Monkey in FMonkeys do
+    if Monkey.Id = AMonkeyId then
+      Exit(Monkey);
+end;
+
 function TWorld.FindMonkeyPosition(const AMonkey: TMonkey; out AX,
   AY: Integer): Boolean;
 var
@@ -502,6 +630,37 @@ begin
         AY := Y;
         Exit(True);
       end;
+end;
+
+procedure TWorld.FindLivingMaxGeneration(out AGenCount: Integer;
+  out AMonkeyId: TMonkeyId);
+var
+  Monkey: TMonkey;
+begin
+  AGenCount := -1;
+  AMonkeyId := 0;
+
+  for Monkey in FMonkeys do
+    if Monkey.Alive and ((AGenCount < 0) or
+      (Monkey.GenCount > AGenCount)) then
+    begin
+      AGenCount := Monkey.GenCount;
+      AMonkeyId := Monkey.Id;
+    end;
+end;
+
+function TWorld.GetLivingMaxGenCount: Integer;
+var
+  MonkeyId: TMonkeyId;
+begin
+  FindLivingMaxGeneration(Result, MonkeyId);
+end;
+
+function TWorld.GetLivingMaxGenMonkeyId: TMonkeyId;
+var
+  GenCount: Integer;
+begin
+  FindLivingMaxGeneration(GenCount, Result);
 end;
 
 function TWorld.GetMonkeyCount: Integer;
@@ -625,6 +784,17 @@ begin
     (AX < FConfig.SizeX) and (AY < FConfig.SizeY);
 end;
 
+function TWorld.LoadSeedWeightsFromJsonFile(const AFileName: string;
+  const AVisionSlots: Integer): TNeuralNetWeights;
+var
+  Config: TNeuralNetConfig;
+  Json: string;
+begin
+  Config := BuildNeuralNetConfig(AVisionSlots);
+  Json := TFile.ReadAllText(AFileName, TEncoding.UTF8);
+  Result := TNeuralNet.WeightsFromJson(Config, Json);
+end;
+
 function TWorld.MonkeyPriority(const AMonkey: TMonkey): Double;
 begin
   Result := AMonkey.TotalStrength;
@@ -638,6 +808,18 @@ begin
   Sigma := Max(0, ASigmaPercent) / 100;
   Result := ABaseValue + (ABaseValue * Sigma * RandomGaussian);
   Result := Max(Result, 0.01);
+end;
+
+function TWorld.MutateWeights(
+  const ABaseWeights: TNeuralNetWeights): TNeuralNetWeights;
+var
+  I: Integer;
+  Sigma: Double;
+begin
+  SetLength(Result, Length(ABaseWeights));
+  Sigma := Max(0, FConfig.MutationSigmaPercent) / 100;
+  for I := Low(ABaseWeights) to High(ABaseWeights) do
+    Result[I] := ABaseWeights[I] + (RandomGaussian * Sigma);
 end;
 
 function TWorld.RandomGaussian: Double;
@@ -696,12 +878,21 @@ var
   I: Integer;
   X: Integer;
   Y: Integer;
+  Json: string;
 begin
   for I := FMonkeys.Count - 1 downto 0 do
     if not FMonkeys[I].Alive then
     begin
+      if (FMonkeys.Count = 1) and TryGetMonkeyWeightsJson(FMonkeys[I].Id,
+        Json) then
+      begin
+        FLastSurvivorWeightsJson := Json;
+        FGenerationEnded := True;
+      end;
+
       if FindMonkeyPosition(FMonkeys[I], X, Y) then
         FBoard[BoardIndex(X, Y)] := nil;
+      Inc(FDeadMonkeyCount);
       FMonkeys.Delete(I);
     end;
 end;
@@ -728,6 +919,7 @@ begin
       try
         FMonkeys.Add(Newborn);
         FBoard[BoardIndex(X, Y)] := Newborn;
+        Inc(FBornMonkeyCount);
       except
         Newborn.Free;
         raise;
@@ -749,6 +941,7 @@ begin
     AAttacker.Strength := AAttacker.Strength + (ADefender.Strength *
       CombatGain);
     ADefender.Kill;
+    Inc(FCombatDeathCount);
     FBoard[BoardIndex(ACurrentX, ACurrentY)] := nil;
     FBoard[BoardIndex(ATargetX, ATargetY)] := AAttacker;
     AAttacker.ShiftMemoryAfterMove(ATargetX - ACurrentX,
@@ -759,6 +952,7 @@ begin
     ADefender.Strength := ADefender.Strength + (AAttacker.Strength *
       CombatGain);
     AAttacker.Kill;
+    Inc(FCombatDeathCount);
     FBoard[BoardIndex(ACurrentX, ACurrentY)] := nil;
   end;
 end;
@@ -818,9 +1012,45 @@ begin
   FConfig.PopulationCount := EnsureAtLeast(FConfig.PopulationCount, 0);
 
   FNextMonkeyId := 0;
+  FWorldStepCount := 0;
+  FDeadMonkeyCount := 0;
+  FCombatDeathCount := 0;
+  FBornMonkeyCount := 0;
+  FMaxGenCount := -1;
+  FMaxGenMonkeyId := 0;
+  FGenerationEnded := False;
+  FLastSurvivorWeightsJson := '';
   FMonkeys.Clear;
   ClearBoard;
-  CreateInitialPopulation;
+  CreateInitialPopulation(nil);
+end;
+
+procedure TWorld.RestartFromWeightsFile(const AConfig: TWorldConfig;
+  const AFileName: string);
+var
+  SeedWeights: TNeuralNetWeights;
+begin
+  FConfig := AConfig;
+
+  FConfig.SizeX := EnsureAtLeast(FConfig.SizeX, 1);
+  FConfig.SizeY := EnsureAtLeast(FConfig.SizeY, 1);
+  FConfig.VisionSlots := EnsureAtLeast(FConfig.VisionSlots, 1);
+  FConfig.PopulationCount := EnsureAtLeast(FConfig.PopulationCount, 0);
+
+  SeedWeights := LoadSeedWeightsFromJsonFile(AFileName, FConfig.VisionSlots);
+
+  FNextMonkeyId := 0;
+  FWorldStepCount := 0;
+  FDeadMonkeyCount := 0;
+  FCombatDeathCount := 0;
+  FBornMonkeyCount := 0;
+  FMaxGenCount := -1;
+  FMaxGenMonkeyId := 0;
+  FGenerationEnded := False;
+  FLastSurvivorWeightsJson := '';
+  FMonkeys.Clear;
+  ClearBoard;
+  CreateInitialPopulation(SeedWeights);
 end;
 
 procedure TWorld.ResolveMonkeyAction(const AMonkey: TMonkey;
@@ -873,6 +1103,7 @@ procedure TWorld.RunWorldTurn;
 var
   I: Integer;
 begin
+  Inc(FWorldStepCount);
   SortMonkeysForTurn;
 
   for I := 0 to FMonkeys.Count - 1 do
@@ -903,6 +1134,54 @@ begin
     begin
       Result := CompareValue(MonkeyPriority(Right), MonkeyPriority(Left));
     end));
+end;
+
+procedure TWorld.SaveMonkeyWeightsJsonToFile(const AMonkeyId: TMonkeyId;
+  const AFileName: string);
+var
+  Json: string;
+begin
+  if not TryGetMonkeyWeightsJson(AMonkeyId, Json) then
+    raise EArgumentException.CreateFmt('Monkey Id %d was not found.',
+      [AMonkeyId]);
+
+  TFile.WriteAllText(AFileName, Json, TEncoding.UTF8);
+end;
+
+procedure TWorld.SaveLastSurvivorWeightsJsonToFile(const AFileName: string);
+begin
+  if FLastSurvivorWeightsJson = '' then
+    raise Exception.Create('No last survivor neural net JSON is available.');
+
+  TFile.WriteAllText(AFileName, FLastSurvivorWeightsJson, TEncoding.UTF8);
+end;
+
+procedure TWorld.TrackMaxGeneration(const AMonkey: TMonkey);
+begin
+  if (AMonkey <> nil) and ((FMaxGenCount < 0) or
+    (AMonkey.GenCount > FMaxGenCount)) then
+  begin
+    FMaxGenCount := AMonkey.GenCount;
+    FMaxGenMonkeyId := AMonkey.Id;
+  end;
+end;
+
+function TWorld.TryGetMonkeyWeightsJson(const AMonkeyId: TMonkeyId;
+  out AJson: string): Boolean;
+var
+  Config: TNeuralNetConfig;
+  Monkey: TMonkey;
+  Weights: TNeuralNetWeights;
+begin
+  AJson := '';
+  Monkey := FindMonkeyById(AMonkeyId);
+  Result := Monkey <> nil;
+  if not Result then
+    Exit;
+
+  Config := BuildNeuralNetConfig(Monkey.VisionSlots);
+  Weights := Monkey.BrainWeights;
+  AJson := TNeuralNet.WeightsToJson(Config, Weights);
 end;
 
 end.

@@ -5,8 +5,8 @@ interface
 uses
   System.SysUtils, System.Types, System.UITypes, System.Classes, System.Variants,
   System.Diagnostics, System.Math, FMX.Types, FMX.Graphics, FMX.Controls,
-  FMX.Forms, FMX.Dialogs, FMX.TabControl, FMX.StdCtrls, FMX.Gestures,
-  FMX.Controls.Presentation, FMX.Layouts, FMX.Edit, FMX.EditBox,
+  FMX.Forms, FMX.Dialogs, FMX.TabControl, FMX.StdCtrls,
+  FMX.Gestures, FMX.Controls.Presentation, FMX.Layouts, FMX.Edit, FMX.EditBox,
   FMX.NumberBox, FMX.Objects, UMonkey, UNeuralNet, UNeuralNetFrame, UWorld;
 
 type
@@ -21,9 +21,19 @@ type
     BPause: TButton;
     BReset: TButton;
     BStep: TButton;
+    BMaxSpeed: TSpeedButton;
     LTurnSpeed: TLabel;
     TurnSpeedTrack: TTrackBar;
     LStepTime: TLabel;
+    LGameCount: TLabel;
+    LWorldStepCount: TLabel;
+    LLiveMonkeyCount: TLabel;
+    LDeadMonkeyCount: TLabel;
+    LCombatDeathCount: TLabel;
+    LBornMonkeyCount: TLabel;
+    LLivingMaxGen: TLabel;
+    LMaxGen: TLabel;
+    LAllGamesMaxGen: TLabel;
     ConfigGroup: TGroupBox;
     StatGroupBox: TGroupBox;
     NSizeX: TNumberBox;
@@ -50,12 +60,15 @@ type
     LPopulationCount: TLabel;
     PWorldBoard: TPaintBox;
     NeuralNetFrame1: TNeuralNetFrame;
+    SaveDjson: TSaveDialog;
+    RoundRect1: TRoundRect;
     procedure FormCreate(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
     procedure BPauseClick(Sender: TObject);
     procedure BResetClick(Sender: TObject);
     procedure BStepClick(Sender: TObject);
     procedure BStartClick(Sender: TObject);
+    procedure BMaxSpeedClick(Sender: TObject);
     procedure PWorldBoardMouseLeave(Sender: TObject);
     procedure PWorldBoardMouseMove(Sender: TObject; Shift: TShiftState; X,
       Y: Single);
@@ -69,7 +82,12 @@ type
     FMonkeyHoverBox: TRectangle;
     FMonkeyHoverText: TText;
     FRunTimer: TTimer;
+    FSelectedBrainMonkeyId: TMonkeyId;
+    FGameCount: Integer;
+    FAllGamesMaxGenCount: Integer;
+    FAllGamesMaxGenMonkeyId: TMonkeyId;
     function BuildWorldConfig: TWorldConfig;
+    procedure BJsonSaveClick(Sender: TObject);
     procedure CreateMonkeyHoverBox;
     procedure DrawMonkey(Canvas: TCanvas; const AX, AY: Integer;
       const ASex: TMonkeySex; const AIsPregnant: Boolean);
@@ -82,6 +100,7 @@ type
     procedure ShowMonkeyHoverBox(const AX, AY: Single;
       const ATraits: TMonkeyTraitSnapshot);
     procedure UpdateRunTimerInterval;
+    procedure UpdateWorldStatistics;
   public
   end;
 
@@ -100,6 +119,7 @@ begin
   FRunTimer.Enabled := False;
   FRunTimer.OnTimer := RunTimerTimer;
   UpdateRunTimerInterval;
+  NeuralNetFrame1.BJsonSave.OnClick := BJsonSaveClick;
   CreateMonkeyHoverBox;
   RestartBoard;
 end;
@@ -116,9 +136,17 @@ begin
   FRunTimer.Enabled := False;
 end;
 
+procedure TTabbedForm.BMaxSpeedClick(Sender: TObject);
+begin
+  UpdateRunTimerInterval;
+end;
+
 procedure TTabbedForm.BResetClick(Sender: TObject);
 begin
   FRunTimer.Enabled := False;
+  FGameCount := 0;
+  FAllGamesMaxGenCount := -1;
+  FAllGamesMaxGenMonkeyId := 0;
   RestartBoard;
 end;
 
@@ -132,6 +160,29 @@ procedure TTabbedForm.BStartClick(Sender: TObject);
 begin
   UpdateRunTimerInterval;
   FRunTimer.Enabled := True;
+end;
+
+procedure TTabbedForm.BJsonSaveClick(Sender: TObject);
+begin
+  if FSelectedBrainMonkeyId = 0 then
+  begin
+    ShowMessage('Select a monkey before saving its neural net JSON.');
+    Exit;
+  end;
+
+  SaveDjson.DefaultExt := 'json';
+  SaveDjson.Filter := 'JSON files (*.json)|*.json|All files (*.*)|*.*';
+  SaveDjson.FileName := Format('monkey_%d_weights.json',
+    [FSelectedBrainMonkeyId]);
+
+  if SaveDjson.Execute then
+    try
+      FWorld.SaveMonkeyWeightsJsonToFile(FSelectedBrainMonkeyId,
+        SaveDjson.FileName);
+    except
+      on E: Exception do
+        ShowMessage('Could not save neural net JSON: ' + E.Message);
+    end;
 end;
 
 function TTabbedForm.BuildWorldConfig: TWorldConfig;
@@ -265,12 +316,16 @@ begin
   if FWorld.TryGetMonkeyBrainAt(BoardX, BoardY, Config, Weights, Inputs,
     Outputs) and FWorld.TryGetMonkeyTraitsAt(BoardX, BoardY, Traits) then
   begin
+    FSelectedBrainMonkeyId := Traits.Id;
     NeuralNetFrame1.ShowMonkeyBrain(Traits, Config, Weights, Inputs, Outputs);
     TabControl.ActiveTab := NNTab;
     NeuralNetFrame1.ActivateGraphView;
   end
   else
+  begin
+    FSelectedBrainMonkeyId := 0;
     NeuralNetFrame1.ClearMonkeyBrain;
+  end;
 end;
 
 procedure TTabbedForm.PWorldBoardMouseLeave(Sender: TObject);
@@ -339,9 +394,13 @@ end;
 procedure TTabbedForm.RestartBoard;
 begin
   FWorld.Restart(BuildWorldConfig);
+  if FGameCount <= 0 then
+    FGameCount := 1;
+  FSelectedBrainMonkeyId := 0;
   HideMonkeyHoverBox;
   NeuralNetFrame1.ClearMonkeyBrain;
   LStepTime.Text := 'Step time: -';
+  UpdateWorldStatistics;
   FCellSize := 16;
 
   PWorldBoard.Position.X := 0;
@@ -358,6 +417,7 @@ end;
 
 procedure TTabbedForm.RunWorldStep;
 var
+  LastJsonFileName: string;
   Stopwatch: TStopwatch;
 begin
   Stopwatch := TStopwatch.StartNew;
@@ -365,6 +425,36 @@ begin
   Stopwatch.Stop;
   LStepTime.Text := Format('Step time: %.3f ms',
     [Stopwatch.Elapsed.TotalMilliseconds]);
+
+  if FWorld.GenerationEnded then
+  begin
+    if FWorld.MaxGenCount > FAllGamesMaxGenCount then
+    begin
+      FAllGamesMaxGenCount := FWorld.MaxGenCount;
+      FAllGamesMaxGenMonkeyId := FWorld.MaxGenMonkeyId;
+    end;
+
+    LastJsonFileName := IncludeTrailingPathDelimiter(ExtractFilePath(ParamStr(0))) +
+      'last.json';
+    try
+      FWorld.SaveLastSurvivorWeightsJsonToFile(LastJsonFileName);
+      FWorld.RestartFromWeightsFile(BuildWorldConfig, LastJsonFileName);
+      Inc(FGameCount);
+      FSelectedBrainMonkeyId := 0;
+      NeuralNetFrame1.ClearMonkeyBrain;
+      FCellSize := 16;
+      PWorldBoard.Width := FWorld.SizeX * FCellSize;
+      PWorldBoard.Height := FWorld.SizeY * FCellSize;
+    except
+      on E: Exception do
+      begin
+        FRunTimer.Enabled := False;
+        ShowMessage('Could not restart from last.json: ' + E.Message);
+      end;
+    end;
+  end;
+
+  UpdateWorldStatistics;
 
   HideMonkeyHoverBox;
   PWorldBoard.Repaint;
@@ -411,9 +501,49 @@ begin
   if FRunTimer = nil then
     Exit;
 
+  if (BMaxSpeed <> nil) and BMaxSpeed.IsPressed then
+  begin
+    FRunTimer.Interval := 1;
+    LTurnSpeed.Text := 'Turn speed: max';
+    Exit;
+  end;
+
   TurnsPerSecond := Max(1, TurnSpeedTrack.Value);
   FRunTimer.Interval := Max(1, Round(1000 / TurnsPerSecond));
   LTurnSpeed.Text := Format('Turn speed: %.0f steps/sec', [TurnsPerSecond]);
+end;
+
+procedure TTabbedForm.UpdateWorldStatistics;
+begin
+  if FWorld = nil then
+    Exit;
+
+  LWorldStepCount.Text := Format('Steps: %d', [FWorld.WorldStepCount]);
+  LGameCount.Text := Format('Games: %d', [FGameCount]);
+  LLiveMonkeyCount.Text := Format('Live monkeys: %d', [FWorld.MonkeyCount]);
+  LDeadMonkeyCount.Text := Format('Dead monkeys: %d',
+    [FWorld.DeadMonkeyCount]);
+  LCombatDeathCount.Text := Format('Combat deaths: %d',
+    [FWorld.CombatDeathCount]);
+  LBornMonkeyCount.Text := Format('Born monkeys: %d',
+    [FWorld.BornMonkeyCount]);
+  if FWorld.LivingMaxGenMonkeyId = 0 then
+    LLivingMaxGen.Text := 'Living max gen: none'
+  else
+    LLivingMaxGen.Text := Format('Living max gen: %d, Id: %d',
+      [FWorld.LivingMaxGenCount, FWorld.LivingMaxGenMonkeyId]);
+
+  if FWorld.MaxGenMonkeyId = 0 then
+    LMaxGen.Text := 'Max gen: none'
+  else
+    LMaxGen.Text := Format('Max gen: %d, Id: %d',
+      [FWorld.MaxGenCount, FWorld.MaxGenMonkeyId]);
+
+  if FAllGamesMaxGenMonkeyId = 0 then
+    LAllGamesMaxGen.Text := 'All games max gen: none'
+  else
+    LAllGamesMaxGen.Text := Format('All games max gen: %d, Id: %d',
+      [FAllGamesMaxGenCount, FAllGamesMaxGenMonkeyId]);
 end;
 
 end.

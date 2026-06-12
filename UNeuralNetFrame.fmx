@@ -7,7 +7,7 @@ object NeuralNetFrame: TNeuralNetFrame
     Size.Width = 1001.000000000000000000
     Size.Height = 518.000000000000000000
     Size.PlatformDefault = False
-    TabIndex = 0
+    TabIndex = 1
     TabOrder = 0
     TabPosition = PlatformDefault
     Sizes = (
@@ -19,7 +19,7 @@ object NeuralNetFrame: TNeuralNetFrame
       CustomIcon = <
         item
         end>
-      IsSelected = True
+      IsSelected = False
       Size.Width = 81.000000000000000000
       Size.Height = 26.000000000000000000
       Size.PlatformDefault = False
@@ -51,7 +51,7 @@ object NeuralNetFrame: TNeuralNetFrame
       CustomIcon = <
         item
         end>
-      IsSelected = False
+      IsSelected = True
       Size.Width = 44.000000000000000000
       Size.Height = 26.000000000000000000
       Size.PlatformDefault = False
@@ -68,6 +68,12 @@ object NeuralNetFrame: TNeuralNetFrame
         Size.PlatformDefault = False
         Text = 'Json Control'
         TabOrder = 0
+        object BJsonSave: TButton
+          Position.X = 16.000000000000000000
+          Position.Y = 32.000000000000000000
+          TabOrder = 38
+          Text = 'Save json'
+        end
       end
       object MemoJson: TMemo
         Touch.InteractiveGestures = [Pan, LongTap, DoubleTap]
@@ -77,8 +83,8 @@ object NeuralNetFrame: TNeuralNetFrame
         Size.Height = 492.000000000000000000
         Size.PlatformDefault = False
         TabOrder = 1
-        Viewport.Width = 881.000000000000000000
-        Viewport.Height = 492.000000000000000000
+        Viewport.Width = 877.000000000000000000
+        Viewport.Height = 488.000000000000000000
       end
     end
   end
