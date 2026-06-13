@@ -3,93 +3,14 @@ unit UMonkey;
 interface
 
 uses
-  UNeuralNet;
+  UBaseMonkey, UNeuralNet;
 
 type
-  TMonkeyId = Int64;
-
-  TMonkeySex = (msMale, msFemale);
-
-  TMonkeyCellState = (mcsUnknown, mcsEmpty, mcsOccupied, mcsBlocked);
-
-  TMonkeyVisionSlot = record
-    RelativeX: Integer;
-    RelativeY: Integer;
-    State: TMonkeyCellState;
-    Sex: TMonkeySex;
-    Strength: Double;
-  end;
-
-  TMonkeyVisionSlots = array of TMonkeyVisionSlot;
-
-  TMonkeyMemorySlot = record
-    RelativeX: Integer;
-    RelativeY: Integer;
-    State: TMonkeyCellState;
-    Sex: TMonkeySex;
-    Strength: Double;
-    LastSeenAge: Integer;
-  end;
-
-  TMonkeyMemorySlots = array of TMonkeyMemorySlot;
-  TMonkeyNNInputs = array of Double;
-
-  TMonkeyStrategy = (stEid, stAgo, stSuperAgo);
-
-  TMonkeyVisionDecision = record
-    IsFar: Boolean;
-    Direction: Integer;
-    class function Default: TMonkeyVisionDecision; static;
-  end;
-
-  TMonkeyActionDecision = record
-    MoveDirection: Integer;
-    WantsToMate: Boolean;
-    NextVision: TMonkeyVisionDecision;
-    class function Stay(const ANextVision: TMonkeyVisionDecision): TMonkeyActionDecision; static;
-  end;
-
-  TMonkeyInit = record
-    Id: TMonkeyId;
-    Sex: TMonkeySex;
-    MotherId: TMonkeyId;
-    FatherId: TMonkeyId;
-    MaternalGrandmotherId: TMonkeyId;
-    MaternalGrandfatherId: TMonkeyId;
-    PaternalGrandmotherId: TMonkeyId;
-    PaternalGrandfatherId: TMonkeyId;
-    GenCount: Integer;
-    Strength: Double;
-    Lifespan: Double;
-    VisionSlots: Integer;
-    BrainWeights: TNeuralNetWeights;
-  end;
-
-  TMonkey = class
+  TMonkey = class(TBaseMonkey)
   private
-    FId: TMonkeyId;
-    FSex: TMonkeySex;
-    FMotherId: TMonkeyId;
-    FFatherId: TMonkeyId;
-    FMaternalGrandmotherId: TMonkeyId;
-    FMaternalGrandfatherId: TMonkeyId;
-    FPaternalGrandmotherId: TMonkeyId;
-    FPaternalGrandfatherId: TMonkeyId;
-    FGenCount: Integer;
-    FStrength: Double;
-    FLifespan: Double;
-    FAge: Integer;
-    FVisionSlots: Integer;
-    FBrainWeights: TNeuralNetWeights;
-    FMemory: TMonkeyMemorySlots;
-    FCurrentVision: TMonkeyVisionDecision;
-    FLastMoveDirection: Integer;
     FUnbornChild: TMonkey;
     FPregnantTurnsRemaining: Integer;
-    FAlive: Boolean;
 
-    class function EnsureAtLeast(const AValue, AMinimum: Integer): Integer; static;
-    class function EnsurePositive(const AValue, ADefault: Double): Double; static;
     class function WinningOutputIndex(const AOutputs: TNeuralNetOutputs;
       const AStartIndex, ACount: Integer): Integer; static;
     function BuildNeuralNetConfig: TNeuralNetConfig;
@@ -102,65 +23,36 @@ type
       ADeltaY: Integer);
     function EidStrategyMove: Integer;
     function EvaluateBrain(const AInputs: TMonkeyNNInputs): TNeuralNetOutputs;
-    function FindMemorySlot(const ARelativeX, ARelativeY: Integer): Integer;
     function FindClosestMonkeyInMemory(out AMemorySlot: TMonkeyMemorySlot): Boolean;
     function FindClosestMonkeyInDirection(const ADirection: Integer;
       out AMemorySlot: TMonkeyMemorySlot): Boolean;
     function GetIsPregnant: Boolean;
-    function GetMemoryCount: Integer;
-    function GetTotalStrength: Double;
-    function GetBrainWeights: TNeuralNetWeights;
     function AgoStrategyMove: Integer;
     function AvoidBlockedMove(const ADirection: Integer): Integer;
     function IsBlockedMove(const ADirection: Integer): Boolean;
     function MoveForTarget(const ARelativeX, ARelativeY: Integer;
       const ATargetSex: TMonkeySex; const ATargetStrength: Double): Integer;
+    function RandomMoveDirection: Integer;
     function SexAsNNValue(const ASlot: TMonkeyMemorySlot): Double;
     function SuperAgoStrategyMove: Integer;
-    procedure ClearMemorySlot(var ASlot: TMonkeyMemorySlot);
-    procedure InitializeMemory;
     procedure StoreVisionSlot(const AVisionSlot: TMonkeyVisionSlot);
   public
     constructor Create(const AInit: TMonkeyInit);
     destructor Destroy; override;
 
     function BuildNNInput: TMonkeyNNInputs;
-    function CurrentVisionDecision: TMonkeyVisionDecision;
     function DecideNextAction(const AVisionSlots: TMonkeyVisionSlots): TMonkeyActionDecision;
     function ExtractUnbornChild: TMonkey;
-    function IsNaturalDeathDue: Boolean;
     function WantsToMateWith(const AMate: TMonkey): Boolean;
-    procedure AdvanceAge;
-    procedure ClearMemory;
     procedure DiscardUnbornChild;
-    procedure ApplyMatingCost(const ATurnCost: Double);
-    procedure Kill;
     procedure StartPregnancy(const ATurns: Integer; const AUnbornChild: TMonkey);
     procedure AdvancePregnancy;
     procedure ShiftMemoryAfterMove(const ADeltaX, ADeltaY: Integer);
     procedure UpdateMemoryFromVision(const AVisionSlots: TMonkeyVisionSlots);
 
-    property Id: TMonkeyId read FId;
-    property Sex: TMonkeySex read FSex;
-    property MotherId: TMonkeyId read FMotherId;
-    property FatherId: TMonkeyId read FFatherId;
-    property MaternalGrandmotherId: TMonkeyId read FMaternalGrandmotherId;
-    property MaternalGrandfatherId: TMonkeyId read FMaternalGrandfatherId;
-    property PaternalGrandmotherId: TMonkeyId read FPaternalGrandmotherId;
-    property PaternalGrandfatherId: TMonkeyId read FPaternalGrandfatherId;
-    property GenCount: Integer read FGenCount;
-    property Strength: Double read FStrength write FStrength;
-    property TotalStrength: Double read GetTotalStrength;
-    property Lifespan: Double read FLifespan write FLifespan;
-    property Age: Integer read FAge;
-    property VisionSlots: Integer read FVisionSlots;
-    property BrainWeights: TNeuralNetWeights read GetBrainWeights;
-    property CurrentVision: TMonkeyVisionDecision read FCurrentVision;
-    property MemoryCount: Integer read GetMemoryCount;
     property UnbornChild: TMonkey read FUnbornChild;
     property PregnantTurnsRemaining: Integer read FPregnantTurnsRemaining;
     property IsPregnant: Boolean read GetIsPregnant;
-    property Alive: Boolean read FAlive;
   end;
 
 implementation
@@ -168,50 +60,13 @@ implementation
 uses
   System.Math;
 
-{ TMonkeyVisionDecision }
-
-class function TMonkeyVisionDecision.Default: TMonkeyVisionDecision;
-begin
-  Result.IsFar := False;
-  Result.Direction := 1;
-end;
-
-{ TMonkeyActionDecision }
-
-class function TMonkeyActionDecision.Stay(
-  const ANextVision: TMonkeyVisionDecision): TMonkeyActionDecision;
-begin
-  Result.MoveDirection := 0;
-  Result.WantsToMate := False;
-  Result.NextVision := ANextVision;
-end;
-
 { TMonkey }
 
 constructor TMonkey.Create(const AInit: TMonkeyInit);
 begin
-  inherited Create;
-
-  FId := AInit.Id;
-  FSex := AInit.Sex;
-  FMotherId := AInit.MotherId;
-  FFatherId := AInit.FatherId;
-  FMaternalGrandmotherId := AInit.MaternalGrandmotherId;
-  FMaternalGrandfatherId := AInit.MaternalGrandfatherId;
-  FPaternalGrandmotherId := AInit.PaternalGrandmotherId;
-  FPaternalGrandfatherId := AInit.PaternalGrandfatherId;
-  FGenCount := EnsureAtLeast(AInit.GenCount, 0);
-  FStrength := EnsurePositive(AInit.Strength, 1);
-  FLifespan := EnsurePositive(AInit.Lifespan, 1);
-  FVisionSlots := EnsureAtLeast(AInit.VisionSlots, 1);
-  FBrainWeights := Copy(AInit.BrainWeights);
-  FCurrentVision := TMonkeyVisionDecision.Default;
-  FLastMoveDirection := 0;
-  InitializeMemory;
-  FAge := 0;
+  inherited Create(AInit);
   FUnbornChild := nil;
   FPregnantTurnsRemaining := 0;
-  FAlive := True;
 end;
 
 destructor TMonkey.Destroy;
@@ -220,30 +75,10 @@ begin
   inherited Destroy;
 end;
 
-procedure TMonkey.AdvanceAge;
-begin
-  if not FAlive then
-    Exit;
-
-  Inc(FAge);
-  if IsNaturalDeathDue then
-    Kill;
-end;
-
 procedure TMonkey.AdvancePregnancy;
 begin
   if FPregnantTurnsRemaining > 0 then
     Dec(FPregnantTurnsRemaining);
-end;
-
-procedure TMonkey.ApplyMatingCost(const ATurnCost: Double);
-begin
-  if not FAlive then
-    Exit;
-
-  FLifespan := EnsurePositive(FLifespan - Max(0, ATurnCost), 0.01);
-  if IsNaturalDeathDue then
-    Kill;
 end;
 
 function TMonkey.BuildNNInput: TMonkeyNNInputs;
@@ -313,27 +148,6 @@ begin
   else
     Result := 0;
   end;
-end;
-
-procedure TMonkey.ClearMemory;
-var
-  I: Integer;
-begin
-  for I := Low(FMemory) to High(FMemory) do
-    ClearMemorySlot(FMemory[I]);
-end;
-
-procedure TMonkey.ClearMemorySlot(var ASlot: TMonkeyMemorySlot);
-begin
-  ASlot.State := mcsUnknown;
-  ASlot.Sex := msMale;
-  ASlot.Strength := 0;
-  ASlot.LastSeenAge := -1;
-end;
-
-function TMonkey.CurrentVisionDecision: TMonkeyVisionDecision;
-begin
-  Result := FCurrentVision;
 end;
 
 function TMonkey.DirectionAwayFrom(const ADirection: Integer): Integer;
@@ -472,27 +286,6 @@ begin
     end;
 end;
 
-procedure TMonkey.DiscardUnbornChild;
-begin
-  FUnbornChild.Free;
-  FUnbornChild := nil;
-  FPregnantTurnsRemaining := 0;
-end;
-
-class function TMonkey.EnsureAtLeast(const AValue, AMinimum: Integer): Integer;
-begin
-  Result := AValue;
-  if Result < AMinimum then
-    Result := AMinimum;
-end;
-
-class function TMonkey.EnsurePositive(const AValue, ADefault: Double): Double;
-begin
-  Result := AValue;
-  if Result <= 0 then
-    Result := ADefault;
-end;
-
 function TMonkey.AgoStrategyMove: Integer;
 var
   BestCount: Integer;
@@ -542,8 +335,16 @@ end;
 function TMonkey.AvoidBlockedMove(const ADirection: Integer): Integer;
 begin
   Result := ADirection;
+
+  if Result = 0 then
+    Exit(RandomMoveDirection);
+
   if IsBlockedMove(Result) then
+  begin
     Result := DirectionAwayFrom(Result);
+    if IsBlockedMove(Result) then
+      Result := RandomMoveDirection;
+  end;
 end;
 
 function TMonkey.EidStrategyMove: Integer;
@@ -649,18 +450,6 @@ begin
     end;
 end;
 
-function TMonkey.FindMemorySlot(const ARelativeX, ARelativeY: Integer): Integer;
-var
-  I: Integer;
-begin
-  Result := -1;
-
-  for I := Low(FMemory) to High(FMemory) do
-    if (FMemory[I].RelativeX = ARelativeX) and
-      (FMemory[I].RelativeY = ARelativeY) then
-      Exit(I);
-end;
-
 function TMonkey.ExtractUnbornChild: TMonkey;
 begin
   Result := FUnbornChild;
@@ -668,30 +457,16 @@ begin
   FPregnantTurnsRemaining := 0;
 end;
 
+procedure TMonkey.DiscardUnbornChild;
+begin
+  FUnbornChild.Free;
+  FUnbornChild := nil;
+  FPregnantTurnsRemaining := 0;
+end;
+
 function TMonkey.GetIsPregnant: Boolean;
 begin
   Result := FPregnantTurnsRemaining > 0;
-end;
-
-function TMonkey.GetBrainWeights: TNeuralNetWeights;
-begin
-  Result := Copy(FBrainWeights);
-end;
-
-function TMonkey.GetMemoryCount: Integer;
-begin
-  Result := Length(FMemory);
-end;
-
-function TMonkey.GetTotalStrength: Double;
-var
-  HalfLifespan: Double;
-begin
-  HalfLifespan := FLifespan / 2;
-  if FAge < HalfLifespan then
-    Result := FStrength + FAge
-  else
-    Result := FStrength - FAge + HalfLifespan;
 end;
 
 function TMonkey.IsBlockedMove(const ADirection: Integer): Boolean;
@@ -728,49 +503,6 @@ begin
   Result := AvoidBlockedMove(Result);
 end;
 
-procedure TMonkey.InitializeMemory;
-var
-  MemoryIndex: Integer;
-  Radius: Integer;
-  RelativeX: Integer;
-  RelativeY: Integer;
-begin
-  SetLength(FMemory, FVisionSlots * 6);
-  MemoryIndex := 0;
-  Radius := 1;
-
-  while MemoryIndex < Length(FMemory) do
-  begin
-    for RelativeY := -Radius to Radius do
-      for RelativeX := -Radius to Radius do
-      begin
-        if (RelativeX = 0) and (RelativeY = 0) then
-          Continue;
-        if Max(Abs(RelativeX), Abs(RelativeY)) <> Radius then
-          Continue;
-
-        FMemory[MemoryIndex].RelativeX := RelativeX;
-        FMemory[MemoryIndex].RelativeY := RelativeY;
-        ClearMemorySlot(FMemory[MemoryIndex]);
-        Inc(MemoryIndex);
-        if MemoryIndex >= Length(FMemory) then
-          Exit;
-      end;
-
-    Inc(Radius);
-  end;
-end;
-
-function TMonkey.IsNaturalDeathDue: Boolean;
-begin
-  Result := FAge >= Round(FLifespan);
-end;
-
-procedure TMonkey.Kill;
-begin
-  FAlive := False;
-end;
-
 procedure TMonkey.StartPregnancy(const ATurns: Integer;
   const AUnbornChild: TMonkey);
 begin
@@ -805,6 +537,31 @@ begin
   else
     Result := 0;
   end;
+end;
+
+function TMonkey.RandomMoveDirection: Integer;
+var
+  Directions: array[0..7] of Integer;
+  I: Integer;
+  J: Integer;
+  Temp: Integer;
+begin
+  for I := Low(Directions) to High(Directions) do
+    Directions[I] := I + 1;
+
+  for I := High(Directions) downto Low(Directions) + 1 do
+  begin
+    J := Random(I + 1);
+    Temp := Directions[I];
+    Directions[I] := Directions[J];
+    Directions[J] := Temp;
+  end;
+
+  for I := Low(Directions) to High(Directions) do
+    if not IsBlockedMove(Directions[I]) then
+      Exit(Directions[I]);
+
+  Result := Directions[Random(Length(Directions))];
 end;
 
 function TMonkey.SuperAgoStrategyMove: Integer;

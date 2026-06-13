@@ -317,12 +317,19 @@
             <Form>TabbedForm</Form>
             <FormType>fmx</FormType>
         </DCCReference>
+        <DCCReference Include="UBaseMonkey.pas"/>
+        <DCCReference Include="UBaseWorld.pas"/>
         <DCCReference Include="UWorld.pas"/>
         <DCCReference Include="UMonkey.pas"/>
         <DCCReference Include="UNeuralNet.pas"/>
         <DCCReference Include="UNeuralNetFrame.pas">
             <Form>NeuralNetFrame</Form>
+            <FormType>fmx</FormType>
             <DesignClass>TFrame</DesignClass>
+        </DCCReference>
+        <DCCReference Include="UAverageAgeGraphForm.pas">
+            <Form>AverageAgeGraphForm</Form>
+            <FormType>fmx</FormType>
         </DCCReference>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>
@@ -519,6 +526,18 @@
                 </DeployFile>
                 <DeployFile LocalName="Android\Debug\styles.xml" Configuration="Debug" Class="AndroidSplashStyles">
                     <Platform Name="Android">
+                        <Overwrite>true</Overwrite>
+                    </Platform>
+                </DeployFile>
+                <DeployFile LocalName="Win64\Debug\MonkeyWorld.exe" Configuration="Debug" Class="ProjectOutput">
+                    <Platform Name="Win64">
+                        <RemoteName>MonkeyWorld.exe</RemoteName>
+                        <Overwrite>true</Overwrite>
+                    </Platform>
+                </DeployFile>
+                <DeployFile LocalName="Win64\Debug\MonkeyWorld.rsm" Configuration="Debug" Class="DebugSymbols">
+                    <Platform Name="Win64">
+                        <RemoteName>MonkeyWorld.rsm</RemoteName>
                         <Overwrite>true</Overwrite>
                     </Platform>
                 </DeployFile>

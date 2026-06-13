@@ -6,8 +6,8 @@ uses
   System.Classes, System.Generics.Collections, System.Generics.Defaults,
   System.Math, System.SysUtils, System.Types, System.UITypes, FMX.Controls,
   FMX.Forms, FMX.Graphics, FMX.Memo, FMX.Memo.Types, FMX.Objects,
-  FMX.ScrollBox, FMX.StdCtrls, FMX.TabControl, FMX.Types, UMonkey,
-  UNeuralNet, UWorld, FMX.Controls.Presentation, FMX.Dialogs;
+  FMX.ScrollBox, FMX.StdCtrls, FMX.TabControl, FMX.Types, UBaseMonkey,
+  UMonkey, UBaseWorld, UNeuralNet, FMX.Controls.Presentation, FMX.Dialogs;
 
 type
   TNeuralNetFrame = class(TFrame)

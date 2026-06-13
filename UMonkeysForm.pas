@@ -7,7 +7,8 @@ uses
   System.Diagnostics, System.Math, FMX.Types, FMX.Graphics, FMX.Controls,
   FMX.Forms, FMX.Dialogs, FMX.TabControl, FMX.StdCtrls,
   FMX.Gestures, FMX.Controls.Presentation, FMX.Layouts, FMX.Edit, FMX.EditBox,
-  FMX.NumberBox, FMX.Objects, UMonkey, UNeuralNet, UNeuralNetFrame, UWorld;
+  FMX.NumberBox, FMX.Objects, UAverageAgeGraphForm, UBaseMonkey,
+  UBaseWorld, UMonkey, UNeuralNet, UNeuralNetFrame, UWorld;
 
 type
   TTabbedForm = class(TForm)
@@ -36,6 +37,8 @@ type
     LAllGamesMaxGen: TLabel;
     ConfigGroup: TGroupBox;
     StatGroupBox: TGroupBox;
+    LAverageAge: TLabel;
+    BAverageAgeGraph: TButton;
     NSizeX: TNumberBox;
     LWorldSizeX: TLabel;
     NSizeY: TNumberBox;
@@ -68,6 +71,7 @@ type
     procedure BResetClick(Sender: TObject);
     procedure BStepClick(Sender: TObject);
     procedure BStartClick(Sender: TObject);
+    procedure BAverageAgeGraphClick(Sender: TObject);
     procedure BMaxSpeedClick(Sender: TObject);
     procedure PWorldBoardMouseLeave(Sender: TObject);
     procedure PWorldBoardMouseMove(Sender: TObject; Shift: TShiftState; X,
@@ -86,19 +90,33 @@ type
     FGameCount: Integer;
     FAllGamesMaxGenCount: Integer;
     FAllGamesMaxGenMonkeyId: TMonkeyId;
+    FLastStepTimeMs: Double;
+    FLastViewRefresh: TStopwatch;
+    FAverageAgeSamples: TAverageAgeSamples;
+    FAverageAgeGraphForm: TAverageAgeGraphForm;
     function BuildWorldConfig: TWorldConfig;
     procedure BJsonSaveClick(Sender: TObject);
+    function CalculateMonkeyAgeStats(out AAverageAge: Double;
+      out AMaxAge: Integer): Boolean;
+    procedure ClearAverageAgeSamples;
     procedure CreateMonkeyHoverBox;
     procedure DrawMonkey(Canvas: TCanvas; const AX, AY: Integer;
       const ASex: TMonkeySex; const AIsPregnant: Boolean);
+    function EvolutionFileDirectory: string;
+    function FindBestGenerationJsonFile(const ADirectory: string;
+      out AFileName: string): Boolean;
     function FormatMonkeyTraits(const ATraits: TMonkeyTraitSnapshot): string;
     procedure HideMonkeyHoverBox;
     function MonkeySexToText(const ASex: TMonkeySex): string;
+    procedure RecordAverageAgeSample;
+    procedure RefreshWorldView(const AForce: Boolean);
     procedure RestartBoard;
     procedure RunWorldStep;
+    function RunWorldStepCore: Boolean;
     procedure RunTimerTimer(Sender: TObject);
     procedure ShowMonkeyHoverBox(const AX, AY: Single;
       const ATraits: TMonkeyTraitSnapshot);
+    procedure UpdateAverageAgeGraph;
     procedure UpdateRunTimerInterval;
     procedure UpdateWorldStatistics;
   public
@@ -111,10 +129,17 @@ implementation
 
 {$R *.fmx}
 
+const
+  MAX_SPEED_WORK_MILLISECONDS = 15;
+  MAX_SPEED_REFRESH_MILLISECONDS = 200;
+  MAX_SPEED_SAFETY_STEPS = 1000;
+
 procedure TTabbedForm.FormCreate(Sender: TObject);
 begin
   TabControl.ActiveTab := WorldTab;
   FWorld := TWorld.Create;
+  FLastStepTimeMs := 0;
+  FLastViewRefresh := TStopwatch.StartNew;
   FRunTimer := TTimer.Create(Self);
   FRunTimer.Enabled := False;
   FRunTimer.OnTimer := RunTimerTimer;
@@ -126,6 +151,7 @@ end;
 
 procedure TTabbedForm.FormDestroy(Sender: TObject);
 begin
+  FreeAndNil(FAverageAgeGraphForm);
   FreeAndNil(FRunTimer);
   FreeAndNil(FMonkeyHoverBox);
   FreeAndNil(FWorld);
@@ -160,6 +186,16 @@ procedure TTabbedForm.BStartClick(Sender: TObject);
 begin
   UpdateRunTimerInterval;
   FRunTimer.Enabled := True;
+end;
+
+procedure TTabbedForm.BAverageAgeGraphClick(Sender: TObject);
+begin
+  FreeAndNil(FAverageAgeGraphForm);
+  FAverageAgeGraphForm := TAverageAgeGraphForm.Create(Self);
+
+  UpdateAverageAgeGraph;
+  FAverageAgeGraphForm.Show;
+  FAverageAgeGraphForm.BringToFront;
 end;
 
 procedure TTabbedForm.BJsonSaveClick(Sender: TObject);
@@ -198,6 +234,39 @@ begin
   Result.MutationSigmaPercent := NMutationSigma.Value;
   Result.InitSigmaPercent := NInitSigma.Value;
   Result.PopulationCount := Round(NPopulationCount.Value);
+end;
+
+function TTabbedForm.CalculateMonkeyAgeStats(out AAverageAge: Double;
+  out AMaxAge: Integer): Boolean;
+var
+  X: Integer;
+  Y: Integer;
+  TotalAge: Int64;
+  Traits: TMonkeyTraitSnapshot;
+begin
+  Result := False;
+  AAverageAge := 0;
+  AMaxAge := 0;
+
+  if (FWorld = nil) or (FWorld.MonkeyCount = 0) then
+    Exit;
+
+  TotalAge := 0;
+  for Y := 0 to FWorld.SizeY - 1 do
+    for X := 0 to FWorld.SizeX - 1 do
+      if FWorld.TryGetMonkeyTraitsAt(X, Y, Traits) then
+      begin
+        Inc(TotalAge, Traits.Age);
+        AMaxAge := Max(AMaxAge, Traits.Age);
+      end;
+
+  AAverageAge := TotalAge / FWorld.MonkeyCount;
+  Result := True;
+end;
+
+procedure TTabbedForm.ClearAverageAgeSamples;
+begin
+  SetLength(FAverageAgeSamples, 0);
 end;
 
 procedure TTabbedForm.CreateMonkeyHoverBox;
@@ -244,6 +313,53 @@ begin
     (AX + 1) * FCellSize,
     (AY + 1) * FCellSize);
   Canvas.FillEllipse(MonkeyRect, 1);
+  if AIsPregnant then
+  begin
+    Canvas.Stroke.Color := TAlphaColors.Black;
+    Canvas.Stroke.Thickness := 1;
+    Canvas.DrawEllipse(MonkeyRect, 1);
+  end;
+end;
+
+function TTabbedForm.EvolutionFileDirectory: string;
+begin
+  Result := IncludeTrailingPathDelimiter(ExtractFilePath(ParamStr(0)));
+end;
+
+function TTabbedForm.FindBestGenerationJsonFile(const ADirectory: string;
+  out AFileName: string): Boolean;
+var
+  BestGen: Integer;
+  CurrentGen: Integer;
+  FileGenText: string;
+  SearchRec: TSearchRec;
+begin
+  Result := False;
+  AFileName := '';
+  BestGen := -1;
+
+  if System.SysUtils.FindFirst(IncludeTrailingPathDelimiter(ADirectory) +
+    'Gen*.json', faAnyFile, SearchRec) <> 0 then
+    Exit;
+  try
+    repeat
+      if (SearchRec.Attr and faDirectory) = 0 then
+      begin
+        FileGenText := Copy(SearchRec.Name, 4,
+          Length(SearchRec.Name) - Length('Gen') - Length('.json'));
+        if SameText(ExtractFileExt(SearchRec.Name), '.json') and
+          TryStrToInt(FileGenText, CurrentGen) and (CurrentGen > BestGen) then
+        begin
+          BestGen := CurrentGen;
+          AFileName := IncludeTrailingPathDelimiter(ADirectory) +
+            SearchRec.Name;
+          Result := True;
+        end;
+      end;
+    until System.SysUtils.FindNext(SearchRec) <> 0;
+  finally
+    System.SysUtils.FindClose(SearchRec);
+  end;
 end;
 
 function TTabbedForm.FormatMonkeyTraits(
@@ -361,7 +477,7 @@ var
   Y: Integer;
   I: Integer;
   CellRect: TRectF;
-  Monkeys: UWorld.TWorldMonkeySnapshots;
+  Monkeys: UBaseWorld.TWorldMonkeySnapshots;
 begin
   Canvas.Fill.Color := TAlphaColors.White;
   Canvas.FillRect(PWorldBoard.LocalRect, 0, 0, [], 1);
@@ -399,7 +515,11 @@ begin
   FSelectedBrainMonkeyId := 0;
   HideMonkeyHoverBox;
   NeuralNetFrame1.ClearMonkeyBrain;
+  FLastStepTimeMs := 0;
+  FLastViewRefresh := TStopwatch.StartNew;
   LStepTime.Text := 'Step time: -';
+  ClearAverageAgeSamples;
+  RecordAverageAgeSample;
   UpdateWorldStatistics;
   FCellSize := 16;
 
@@ -411,20 +531,51 @@ begin
 end;
 
 procedure TTabbedForm.RunTimerTimer(Sender: TObject);
+var
+  BatchStopwatch: TStopwatch;
+  StepsMade: Integer;
 begin
+  if (BMaxSpeed <> nil) and BMaxSpeed.IsPressed then
+  begin
+    StepsMade := 0;
+    BatchStopwatch := TStopwatch.StartNew;
+
+    repeat
+      if not RunWorldStepCore then
+        Break;
+      Inc(StepsMade);
+    until (not FRunTimer.Enabled) or (not BMaxSpeed.IsPressed) or
+      (BatchStopwatch.ElapsedMilliseconds >= MAX_SPEED_WORK_MILLISECONDS) or
+      (StepsMade >= MAX_SPEED_SAFETY_STEPS);
+
+    if StepsMade > 0 then
+      RefreshWorldView(False);
+    Exit;
+  end;
+
   RunWorldStep;
 end;
 
 procedure TTabbedForm.RunWorldStep;
+begin
+  if RunWorldStepCore then
+    RefreshWorldView(True);
+end;
+
+function TTabbedForm.RunWorldStepCore: Boolean;
 var
+  BestGenJsonFileName: string;
+  EvolutionDirectory: string;
+  GenJsonFileName: string;
   LastJsonFileName: string;
   Stopwatch: TStopwatch;
 begin
+  Result := False;
   Stopwatch := TStopwatch.StartNew;
   FWorld.RunWorldTurn;
   Stopwatch.Stop;
-  LStepTime.Text := Format('Step time: %.3f ms',
-    [Stopwatch.Elapsed.TotalMilliseconds]);
+  FLastStepTimeMs := Stopwatch.Elapsed.TotalMilliseconds;
+  RecordAverageAgeSample;
 
   if FWorld.GenerationEnded then
   begin
@@ -434,11 +585,20 @@ begin
       FAllGamesMaxGenMonkeyId := FWorld.MaxGenMonkeyId;
     end;
 
-    LastJsonFileName := IncludeTrailingPathDelimiter(ExtractFilePath(ParamStr(0))) +
-      'last.json';
+    EvolutionDirectory := EvolutionFileDirectory;
+    LastJsonFileName := EvolutionDirectory + 'last.json';
+    GenJsonFileName := EvolutionDirectory + Format('Gen%d.json',
+      [FWorld.MaxGenCount]);
     try
       FWorld.SaveLastSurvivorWeightsJsonToFile(LastJsonFileName);
-      FWorld.RestartFromWeightsFile(BuildWorldConfig, LastJsonFileName);
+      FWorld.SaveMaxGenerationWeightsJsonToFile(GenJsonFileName);
+      if not FindBestGenerationJsonFile(EvolutionDirectory,
+        BestGenJsonFileName) then
+        BestGenJsonFileName := GenJsonFileName;
+      FWorld.RestartFromParentWeightsFiles(BuildWorldConfig, LastJsonFileName,
+        BestGenJsonFileName);
+      ClearAverageAgeSamples;
+      RecordAverageAgeSample;
       Inc(FGameCount);
       FSelectedBrainMonkeyId := 0;
       NeuralNetFrame1.ClearMonkeyBrain;
@@ -449,15 +609,62 @@ begin
       on E: Exception do
       begin
         FRunTimer.Enabled := False;
-        ShowMessage('Could not restart from last.json: ' + E.Message);
+        ShowMessage('Could not restart from evolution JSON files: ' +
+          E.Message);
+        Exit;
       end;
     end;
   end;
 
-  UpdateWorldStatistics;
+  Result := True;
+end;
 
+procedure TTabbedForm.RecordAverageAgeSample;
+var
+  AverageAge: Double;
+  MaxAge: Integer;
+  SampleCount: Integer;
+begin
+  if not CalculateMonkeyAgeStats(AverageAge, MaxAge) then
+    Exit;
+  SampleCount := Length(FAverageAgeSamples);
+  if (SampleCount > 0) and
+
+    (FAverageAgeSamples[SampleCount - 1].Step = FWorld.WorldStepCount) then
+  begin
+    FAverageAgeSamples[SampleCount - 1].AverageAge := AverageAge;
+    FAverageAgeSamples[SampleCount - 1].MaxAge := MaxAge;
+    Exit;
+  end;
+
+  SetLength(FAverageAgeSamples, SampleCount + 1);
+  FAverageAgeSamples[SampleCount].Step := FWorld.WorldStepCount;
+  FAverageAgeSamples[SampleCount].AverageAge := AverageAge;
+  FAverageAgeSamples[SampleCount].MaxAge := MaxAge;
+end;
+
+procedure TTabbedForm.UpdateAverageAgeGraph;
+begin
+  if (FAverageAgeGraphForm <> nil) and FAverageAgeGraphForm.Visible then
+    FAverageAgeGraphForm.LoadSamples(FAverageAgeSamples);
+end;
+
+procedure TTabbedForm.RefreshWorldView(const AForce: Boolean);
+begin
+  if (not AForce) and
+    (FLastViewRefresh.ElapsedMilliseconds < MAX_SPEED_REFRESH_MILLISECONDS) then
+    Exit;
+
+  if FLastStepTimeMs > 0 then
+    LStepTime.Text := Format('Step time: %.3f ms', [FLastStepTimeMs])
+  else
+    LStepTime.Text := 'Step time: -';
+
+  UpdateWorldStatistics;
+  UpdateAverageAgeGraph;
   HideMonkeyHoverBox;
   PWorldBoard.Repaint;
+  FLastViewRefresh := TStopwatch.StartNew;
 end;
 
 procedure TTabbedForm.ShowMonkeyHoverBox(const AX, AY: Single;
@@ -514,6 +721,9 @@ begin
 end;
 
 procedure TTabbedForm.UpdateWorldStatistics;
+var
+  AverageAge: Double;
+  MaxAge: Integer;
 begin
   if FWorld = nil then
     Exit;
@@ -521,6 +731,10 @@ begin
   LWorldStepCount.Text := Format('Steps: %d', [FWorld.WorldStepCount]);
   LGameCount.Text := Format('Games: %d', [FGameCount]);
   LLiveMonkeyCount.Text := Format('Live monkeys: %d', [FWorld.MonkeyCount]);
+  if not CalculateMonkeyAgeStats(AverageAge, MaxAge) then
+    LAverageAge.Text := 'Average age: -'
+  else
+    LAverageAge.Text := Format('Average age: %.1f', [AverageAge]);
   LDeadMonkeyCount.Text := Format('Dead monkeys: %d',
     [FWorld.DeadMonkeyCount]);
   LCombatDeathCount.Text := Format('Combat deaths: %d',
